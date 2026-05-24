@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Icey TEM4 Review System</title>
+<style>
+:root{
+  --bg:#f4f1ec;--card:#faf9f7;--text:#1c1a17;--sub:#6b6560;
+  --accent:#e04e2f;--accent2:#2b5cb0;--accent-light:#fef0ed;
+  --success:#3a7d5a;--danger:#c94a3c;--warn:#d4922c;
+  --border:#e6e1d8;--radius:2px;--shadow:2px 2px 0 rgba(0,0,0,.06);
+  --sidebar-w:260px;--ai-w:380px;
+}
+@font-face{font-family:'Editorial';src:local('Georgia'),local('Noto Serif SC'),local('SimSun');}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif;background:var(--bg);color:var(--text);line-height:1.7;-webkit-font-smoothing:antialiased;position:relative}
+
+/* Noise texture overlay */
+body::before{
+  content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;opacity:.04;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Halftone dots - decorative */
+.halftone-bg{
+  position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.03;
+  background-image:radial-gradient(circle,var(--text) 1px,transparent 1px);
+  background-size:10px 10px;
+}
+
+/* Layout */
+.app{display:flex;min-height:100vh;max-width:100vw;overflow-x:hidden;position:relative;z-index:1}
+
+/* Sidebar */
+.sidebar{width:var(--sidebar-w);background:var(--card);border-right:2px solid var(--text);position:fixed;top:0;left:0;bottom:0;z-index:100;display:flex;flex-direction:column;transition:transform .3s cubic-bezier(.4,0,.2,1);background-image:radial-gradient(circle,#e8e4de 1px,transparent 1px);background-size:12px 12px;background-position:0 0}
+.sidebar-brand{padding:28px 20px;border-bottom:2px solid var(--text);text-align:center;cursor:pointer;position:relative}
+.sidebar-brand .logo{font-size:32px;margin-bottom:6px;display:block}
+.sidebar-brand h1{font-size:15px;font-weight:800;color:var(--accent);letter-spacing:1px;text-transform:uppercase}
+.sidebar-brand .tagline{font-size:9px;color:var(--sub);text-transform:uppercase;letter-spacing:2px;margin-top:3px}
+.sidebar-nav{flex:1;overflow-y:auto;padding:8px 0}
+.cat-btn{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 20px;background:none;border:none;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;transition:all .15s;gap:8px;text-transform:uppercase;letter-spacing:.5px}
+.cat-btn:hover{background:rgba(0,0,0,.03)}
+.cat-btn .arr{font-size:8px;transition:transform .25s;color:var(--sub)}
+.cat-btn.open .arr{transform:rotate(90deg)}
+.cat-kids{display:none;background:rgba(0,0,0,.015)}
+.cat-kids.show{display:block}
+.topic-link{display:block;padding:9px 20px 9px 44px;font-size:12px;color:var(--sub);cursor:pointer;border-left:3px solid transparent;transition:all .15s;text-decoration:none}
+.topic-link:hover{color:var(--accent);background:var(--accent-light);border-left-color:var(--accent)}
+.topic-link.active{color:var(--accent);background:var(--accent-light);border-left-color:var(--accent);font-weight:700}
+.sidebar-foot{padding:14px 20px;border-top:2px solid var(--text);font-size:9px;color:var(--sub);text-align:center;text-transform:uppercase;letter-spacing:1px}
+
+/* Main */
+.main{flex:1;margin-left:var(--sidebar-w);margin-right:0;padding:28px 32px;max-width:860px;transition:margin .3s;position:relative;z-index:1}
+.main.ai-open{margin-right:var(--ai-w)}
+
+/* Mobile */
+.mob-bar{display:none;position:fixed;top:0;left:0;right:0;z-index:90;background:var(--card);border-bottom:2px solid var(--text);padding:10px 16px;align-items:center;justify-content:space-between}
+.mob-bar .mob-title{font-size:13px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:1px}
+.mob-btn{width:36px;height:36px;border-radius:0;border:2px solid var(--text);background:var(--card);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.mob-btn:hover{background:var(--text);color:var(--card)}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:95;backdrop-filter:blur(2px)}
+
+/* Hero */
+.hero{text-align:center;padding:64px 20px 44px;position:relative}
+.hero::before{
+  content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:200px;height:200px;z-index:0;opacity:.06;
+  background-image:radial-gradient(circle,var(--accent) 2px,transparent 2px);
+  background-size:16px 16px;
+}
+.hero>*{position:relative;z-index:1}
+.hero .emoji{font-size:64px;margin-bottom:12px;display:block}
+.hero h2{font-size:32px;font-weight:900;letter-spacing:-1px;margin-bottom:6px;color:var(--text)}
+.hero h2 em{font-style:normal;color:var(--accent)}
+.hero p{color:var(--sub);font-size:14px;max-width:480px;margin:8px auto 32px;line-height:1.6}
+.hero-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;max-width:760px;margin:0 auto}
+.hero-card{background:var(--card);border:2px solid var(--text);padding:22px 18px;cursor:pointer;transition:all .2s;text-align:center;position:relative}
+.hero-card:hover{transform:translate(-2px,-2px);box-shadow:4px 4px 0 rgba(0,0,0,.1)}
+.hero-card:active{transform:translate(0,0);box-shadow:none}
+.hero-card .hc-icon{font-size:30px;margin-bottom:8px;display:block}
+.hero-card .hc-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.hero-card .hc-count{font-size:10px;color:var(--sub);margin-top:3px}
+
+/* Category head */
+.cat-head{background:var(--card);border:2px solid var(--text);padding:28px;margin-bottom:20px;position:relative}
+.cat-head .ch-icon{font-size:36px;margin-bottom:8px}
+.cat-head h2{font-size:20px;font-weight:800;margin-bottom:6px}
+.cat-head p{color:var(--sub);font-size:13px}
+
+.topic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:20px}
+.t-card{background:var(--card);border:2px solid var(--text);padding:20px;cursor:pointer;transition:all .2s}
+.t-card:hover{transform:translate(-2px,-2px);box-shadow:4px 4px 0 rgba(0,0,0,.1)}
+.t-card .ttl{font-weight:800;font-size:14px;margin-bottom:4px}
+.t-card .dsc{font-size:11px;color:var(--sub)}
+
+/* Topic page */
+.topic-hero{margin-bottom:20px}
+.topic-hero .bread{font-size:11px;color:var(--sub);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.topic-hero .bread span{color:var(--accent);font-weight:700}
+.topic-hero h2{font-size:24px;font-weight:900}
+
+/* Content blocks */
+.content-block{background:var(--card);border:2px solid var(--text);padding:28px;margin-bottom:20px;position:relative}
+.content-block::after{content:'';position:absolute;bottom:8px;right:8px;width:40px;height:40px;opacity:.03;background-image:radial-gradient(circle,var(--text) 1.5px,transparent 1.5px);background-size:6px 6px;pointer-events:none}
+.content-block h3{font-size:17px;margin-bottom:14px;color:var(--accent);padding-bottom:10px;border-bottom:2px solid var(--text);font-weight:800}
+.content-block h4{font-size:14px;margin:18px 0 8px;font-weight:700}
+.content-block p{font-size:13.5px;margin-bottom:10px}
+.content-block ul,.content-block ol{margin:0 0 14px 20px;font-size:13.5px}
+.content-block li{margin-bottom:5px}
+.content-block table{width:100%;border-collapse:collapse;margin:10px 0 18px;font-size:12.5px;border:2px solid var(--text)}
+.content-block th{background:var(--text);color:var(--card);padding:9px 12px;text-align:left;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.content-block td{padding:9px 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
+.content-block tr:hover td{background:rgba(0,0,0,.02)}
+
+.ex-box{background:var(--card);border-left:4px solid var(--text);padding:12px 16px;margin:10px 0;font-size:13px;position:relative}
+.ex-box .en{font-style:italic;margin-bottom:3px;font-family:Editorial,Georgia,serif}
+.ex-box .cn{color:var(--sub);font-size:12px}
+
+.highlight{background:rgba(224,78,47,.1);padding:2px 5px;font-weight:600;font-size:12px;color:var(--accent)}
+.tip{background:rgba(58,125,90,.06);border:2px solid var(--success);padding:12px 16px;margin:10px 0;font-size:12.5px;display:flex;gap:8px;align-items:flex-start}
+.tip .ti{flex-shrink:0;font-size:16px}
+.warn{background:rgba(224,78,47,.04);border:2px solid var(--danger);padding:12px 16px;margin:10px 0;font-size:12.5px;display:flex;gap:8px;align-items:flex-start}
+.warn .wi{flex-shrink:0;font-size:16px}
+
+/* Quiz */
+.quiz-block{background:var(--card);border:2px solid var(--text);padding:24px;margin-bottom:20px;position:relative}
+.quiz-block h3{font-size:15px;margin-bottom:4px;font-weight:800}
+.quiz-progress{font-size:11px;color:var(--sub);margin-bottom:18px}
+.quiz-q{background:rgba(0,0,0,.015);padding:18px;margin-bottom:16px;border:1px solid var(--border)}
+.quiz-q .q-text{font-weight:700;font-size:14px;margin-bottom:14px}
+.quiz-opts{display:flex;flex-direction:column;gap:8px}
+.quiz-opt{padding:11px 14px;border:2px solid var(--border);cursor:pointer;transition:all .15s;font-size:13px;background:var(--card)}
+.quiz-opt:hover{border-color:var(--text);transform:translateX(2px)}
+.quiz-opt.sel{border-color:var(--text);background:rgba(0,0,0,.04)}
+.quiz-opt.correct{border-color:var(--success);background:rgba(58,125,90,.08)}
+.quiz-opt.wrong{border-color:var(--danger);background:rgba(224,78,47,.06)}
+.quiz-opt.disabled{pointer-events:none}
+.quiz-fb{display:none;margin-top:12px;padding:12px 16px;font-size:12.5px;border:2px solid}
+.quiz-fb.show{display:block}
+.quiz-fb.ok{border-color:var(--success);background:rgba(58,125,90,.06);color:#166534}
+.quiz-fb.bad{border-color:var(--danger);background:rgba(224,78,47,.04);color:#991b1b}
+.quiz-btns{display:flex;justify-content:space-between;align-items:center;margin-top:18px}
+.quiz-btns .info{font-size:11px;color:var(--sub)}
+.btn{padding:9px 18px;border:2px solid var(--text);cursor:pointer;font-size:12px;font-weight:700;transition:all .15s;text-transform:uppercase;letter-spacing:.5px;background:var(--card)}
+.btn:hover{transform:translate(-1px,-1px);box-shadow:2px 2px 0 rgba(0,0,0,.15)}
+.btn:active{transform:translate(0,0);box-shadow:none}
+.btn-p{background:var(--text);color:var(--card)}
+.btn-p:hover{background:var(--accent);border-color:var(--accent)}
+.btn-o{background:var(--card);color:var(--text)}
+.btn-o:hover{background:var(--text);color:var(--card)}
+.btn:disabled{opacity:.3;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* Score */
+.score-box{text-align:center;padding:30px}
+.score-box .big{font-size:48px;font-weight:900;color:var(--accent)}
+.score-box .lbl{font-size:12px;color:var(--sub);margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+.score-box .emoji{font-size:40px;margin-top:8px}
+
+/* Past Exam */
+.past-exam-block{background:var(--card);border:2px solid var(--text);padding:24px;margin-bottom:20px}
+.past-exam-block h3{font-size:15px;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.past-exam-block .pe-subtitle{font-size:13px;color:var(--sub);margin-bottom:16px}
+.pe-question{padding:16px 0;border-bottom:1px solid var(--border);position:relative}
+.pe-question .pe-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.pe-question .pe-year{font-size:11px;background:var(--text);color:var(--card);padding:3px 8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.pe-question .pe-qtext{font-size:13px;font-weight:600;margin-bottom:12px}
+.pe-question .pe-opts{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.pe-question .pe-opt{padding:8px 12px;border:2px solid var(--border);cursor:pointer;font-size:12px;transition:all .12s;background:var(--card)}
+.pe-question .pe-opt:hover{border-color:var(--text);transform:translateX(2px)}
+.pe-question .pe-opt.right{border-color:var(--success);background:rgba(58,125,90,.08)}
+.pe-question .pe-opt.wrong{border-color:var(--danger);background:rgba(224,78,47,.06)}
+.pe-question .pe-exp{display:none;margin-top:10px;padding:10px 14px;background:rgba(212,146,44,.08);border:1px solid var(--warn);font-size:13px;color:#5c3d0e}
+.pe-question .pe-exp.show{display:block}
+.pe-question .pe-toggle{font-size:11px;color:var(--accent);cursor:pointer;margin-top:6px;display:inline-block;font-weight:700;text-transform:uppercase;letter-spacing:.5px;text-decoration:underline}
+
+/* AI Panel */
+.ai-panel{position:fixed;top:0;right:0;bottom:0;width:var(--ai-w);background:var(--card);border-left:2px solid var(--text);z-index:100;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);background-image:radial-gradient(circle,#e8e4de .5px,transparent .5px);background-size:8px 8px}
+.ai-panel.open{transform:translateX(0)}
+.ai-header{padding:16px 20px;border-bottom:2px solid var(--text);display:flex;align-items:center;justify-content:space-between}
+.ai-header h3{font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.5px}
+.ai-close{background:none;border:2px solid var(--text);font-size:14px;cursor:pointer;color:var(--text);padding:2px 8px;font-weight:700}
+.ai-close:hover{background:var(--text);color:var(--card)}
+.ai-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.ai-msg{max-width:90%;padding:10px 14px;font-size:12.5px;line-height:1.55;border:2px solid var(--text)}
+.ai-msg.user{align-self:flex-end;background:var(--text);color:var(--card)}
+.ai-msg.assistant{align-self:flex-start;background:var(--card)}
+.ai-msg.loading{display:flex;gap:4px;padding:12px 16px;border-style:dashed}
+.ai-msg.loading .dot{width:6px;height:6px;border-radius:50%;background:var(--text);animation:bounce 1.4s infinite ease-in-out both}
+.ai-msg.loading .dot:nth-child(1){animation-delay:-.32s}
+.ai-msg.loading .dot:nth-child(2){animation-delay:-.16s}
+@keyframes bounce{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}
+.ai-input-area{padding:12px 16px;border-top:2px solid var(--text)}
+.ai-input-row{display:flex;gap:8px}
+.ai-input-row input{flex:1;padding:9px 12px;border:2px solid var(--text);font-size:12px;outline:none;font-family:inherit;background:var(--card)}
+.ai-input-row input:focus{border-color:var(--accent)}
+.ai-input-row button{padding:9px 14px;background:var(--text);color:var(--card);border:2px solid var(--text);font-size:11px;cursor:pointer;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.ai-input-row button:hover{background:var(--accent);border-color:var(--accent)}
+.ai-settings{padding:8px 16px;font-size:9px;color:var(--sub);display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--border)}
+.ai-settings input{flex:1;padding:5px 8px;border:2px solid var(--border);font-size:9px;outline:none;background:var(--card)}
+.ai-settings input:focus{border-color:var(--text)}
+
+.ai-toggle{position:fixed;right:16px;bottom:24px;z-index:99;width:48px;height:48px;border:2px solid var(--text);background:var(--card);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.ai-toggle:hover{background:var(--text);transform:translate(-2px,-2px);box-shadow:3px 3px 0 rgba(0,0,0,.15)}
+
+/* Writing */
+.essay-topic-card{background:var(--card);border:2px solid var(--text);padding:20px;margin-bottom:12px}
+.essay-topic-card .et-year{font-size:10px;color:var(--accent);font-weight:800;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px}
+.essay-topic-card .et-title{font-size:14px;font-weight:700;margin-bottom:10px}
+.essay-topic-card .et-outline{font-size:12px;color:var(--sub);line-height:1.6}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:var(--text);border-radius:0}
+.sidebar-nav::-webkit-scrollbar{width:3px}
+code{background:rgba(0,0,0,.04);padding:2px 5px;font-size:12px;color:var(--accent);border:1px solid var(--border)}
+
+@media(max-width:900px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.mob{transform:translateX(0)}
+  .main{margin-left:0;padding:60px 16px 24px}
+  .main.ai-open{margin-right:0}
+  .ai-panel{width:100%;max-width:100%}
+  .mob-bar{display:flex}
+  .overlay.show{display:block}
+  .hero-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+  .topic-grid{grid-template-columns:1fr}
+  .hero{padding:30px 10px 20px}
+  .hero h2{font-size:22px}
+  .pe-question .pe-opts{grid-template-columns:1fr}
+  .hero-card{padding:16px 12px}
+}
+
+@media(max-width:480px){
+  .hero-grid{grid-template-columns:1fr 1fr}
+  .content-block,.quiz-block,.past-exam-block{padding:16px}
+}
+</style>
+</head>
+<body>
+
+<div class="halftone-bg"></div>
+
+<div class="app">
+
+<!-- Mobile Bar -->
+<div class="mob-bar">
+  <button class="mob-btn" onclick="toggleSidebar()">☰</button>
+  <span class="mob-title">Icey TEM4</span>
+  <button class="mob-btn" onclick="toggleAIPanel()">💬</button>
+</div>
+<div class="overlay" onclick="closeAll()"></div>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand" onclick="showHome()">
+    <div class="logo">●</div>
+    <h1>Icey TEM4</h1>
+    <div class="tagline">Review System</div>
+  </div>
+  <nav class="sidebar-nav" id="sidebarNav"></nav>
+  <div class="sidebar-foot">ICEY · TEM-4 · MMXXVI</div>
+</aside>
+
+<!-- AI Toggle -->
+<button class="ai-toggle" onclick="toggleAIPanel()" id="aiToggle">💬</button>
+
+<!-- Main -->
+<main class="main" id="mainContent"></main>
+
+<!-- AI Panel -->
+<div class="ai-panel" id="aiPanel">
+  <div class="ai-header">
+    <h3>◉ AI 助教</h3>
+    <button class="ai-close" onclick="toggleAIPanel()">✕</button>
+  </div>
+  <div class="ai-settings">
+    <span>API KEY</span>
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+    <button onclick="saveApiKey()" style="padding:4px 8px;font-size:9px;border:2px solid var(--text);background:var(--card);cursor:pointer;font-weight:700">保存</button>
+  </div>
+  <div class="ai-msgs" id="aiMessages">
+    <div class="ai-msg assistant">你好！我是 TEM4 复习助手。<br>可以问我任何专四相关问题：<br>· 语法点不理解？<br>· 真题为什么选这个答案？<br>· 作文思路和模板？<br>· 听力和阅读技巧？<br><br>请先设置 Anthropic API Key。</div>
+  </div>
+  <div class="ai-input-area">
+    <div class="ai-input-row">
+      <input id="aiInput" placeholder="问任何 TEM4 问题..." onkeydown="if(event.key==='Enter')sendMsg()">
+      <button onclick="sendMsg()">发送</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// ==================== DATA ====================
+const DATA={categories:[
+{id:'grammar',icon:'◧',name:'语法知识',intro:'英语专四语法核心考点，涵盖时态语态、虚拟语气、非谓语动词、三大从句等15个知识点。每个知识点配有详细讲解、练习题和历年真题。',topics:[
+{id:'tense',title:'时态与语态',desc:'16种时态及主动/被动语态转换规则，含近年真题详解',content:`
+<h3>英语时态总览</h3>
+<p>英语共有 <strong>16种时态</strong>，由"时间"（过去、现在、将来、过去将来）和"状态"（一般、进行、完成、完成进行）组合而成。专四考试重点考查<strong>现在完成时、过去完成时、将来完成时</strong>以及各时态的<strong>被动语态</strong>。</p>
+
+<h4>一、核心时态详解</h4>
+<table><tr><th>时态</th><th>构成</th><th>核心用法</th></tr>
+<tr><td>一般现在时</td><td>do / does</td><td>经常性动作、客观真理、时刻表</td></tr>
+<tr><td>一般过去时</td><td>did</td><td>过去某时发生的动作</td></tr>
+<tr><td>一般将来时</td><td>will do</td><td>将来发生的动作</td></tr>
+<tr><td>现在完成时</td><td>have / has done</td><td>过去发生、影响持续到现在。标志词：already, yet, since, for, in the past...</td></tr>
+<tr><td>过去完成时</td><td>had done</td><td>"过去的过去"。标志词：by the time+过去, before+过去, after+过去完成</td></tr>
+<tr><td>将来完成时</td><td>will have done</td><td>将来某时之前已完成的动作。标志词：by+将来时间</td></tr>
+<tr><td>现在进行时</td><td>am/is/are doing</td><td>正在进行的动作；与always连用表感情色彩</td></tr>
+<tr><td>过去进行时</td><td>was/were doing</td><td>过去某时正在进行的动作</td></tr>
+<tr><td>现在完成进行时</td><td>have/has been doing</td><td>从过去持续到现在，可能继续下去</td></tr></table>
+
+<h4>二、专四高频考点</h4>
+<p><strong>1. 现在完成时 vs 一般过去时</strong></p>
+<p>现在完成时强调<strong>与现在的联系</strong>；一般过去时只陈述过去事实，与现在无关。</p>
+<div class="ex-box"><div class="en">I <strong>have lost</strong> my key. (现在还没找到)</div><div class="cn">vs. I <strong>lost</strong> my key yesterday. (只讲昨天的事，现在可能已找到)</div></div>
+
+<p><strong>2. 过去完成时</strong> — 专四最常考！</p>
+<p>表示"过去的过去"，常与 by the time, before, when, after 连用。</p>
+<div class="ex-box"><div class="en">By the time he arrived, the meeting <strong>had already started</strong>.</div><div class="cn">他到达时，会议已经开始。</div></div>
+<div class="ex-box"><div class="en">No sooner <strong>had</strong> I <strong>left</strong> the house than it began to rain.</div><div class="cn">我刚离开房子就下雨了。（倒装+过去完成时）</div></div>
+
+<p><strong>3. 将来完成时</strong></p>
+<div class="ex-box"><div class="en">By next June, I <strong>will have graduated</strong> from college.</div><div class="cn">到明年六月，我将已经大学毕业。</div></div>
+
+<h4>三、被动语态</h4>
+<p>构成：<code>be + 过去分词</code>。不同时态的被动语态通过 be 动词的变化来体现。</p>
+<table><tr><th>时态</th><th>主动</th><th>被动</th></tr>
+<tr><td>一般现在时</td><td>He writes it.</td><td>It <strong>is written</strong>.</td></tr>
+<tr><td>一般过去时</td><td>He wrote it.</td><td>It <strong>was written</strong>.</td></tr>
+<tr><td>现在完成时</td><td>He has written it.</td><td>It <strong>has been written</strong>.</td></tr>
+<tr><td>过去完成时</td><td>He had written it.</td><td>It <strong>had been written</strong>.</td></tr>
+<tr><td>将来完成时</td><td>He will have written it.</td><td>It <strong>will have been written</strong>.</td></tr>
+<tr><td>现在进行时</td><td>He is writing it.</td><td>It <strong>is being written</strong>.</td></tr>
+<tr><td>情态动词</td><td>He must write it.</td><td>It <strong>must be written</strong>.</td></tr></table>
+
+<div class="warn"><span class="wi">⚠</span><div>不及物动词和系动词（happen, occur, appear, seem, taste, feel, sound 等）<strong>没有被动语态</strong>。特别注意：take place, belong to, break out 等短语也无被动。</div></div>
+
+<div class="tip"><span class="ti">✦</span><div><strong>解题技巧：</strong>看到 by the time + 过去时间 → 过去完成时；by + 将来时间 → 将来完成时；No sooner / Hardly / Scarcely 句首 + had + 主语 + done。注意时间状语和上下文的参照。</div></div>
+`,practice:[
+{q:"By the time he retires, he ______ for this company for 30 years.",o:["will work","will be working","will have worked","has worked"],a:2,e:"by the time + 将来时间(从句用一般现在时表将来)，主句用将来完成时。for 30 years 强调持续→用完成时。"},
+{q:"No sooner ______ the station than the train left.",o:["had I reached","I had reached","did I reach","I reached"],a:0,e:"No sooner...than 句型要求：1) 主句用过去完成时 2) No sooner 置于句首时主句要部分倒装。"},
+{q:"Great changes ______ in our hometown in the past decade.",o:["took place","have taken place","were taken place","have been taken place"],a:1,e:"take place = 发生，不及物动词短语，没有被动语态。in the past decade 是现在完成时的标志。"},
+{q:"The new bridge ______ by the end of next year.",o:["will complete","will be completing","will have been completed","has been completed"],a:2,e:"by + 将来时间 → 将来完成时；bridge 与 complete 是被动关系 → 将来完成时的被动语态。"},
+{q:"I ______ my homework before my mother came back.",o:["finished","have finished","had finished","would finish"],a:2,e:"before 引导的从句用一般过去时(came)，主句动作发生在 came 之前，用过去完成时表示「过去的过去」。"}
+],pastExam:[
+{y:2023,q:"By the time you arrive in London, we ______ in Europe for two weeks.",o:["shall stay","have stayed","will have stayed","have been staying"],a:2,e:"by the time + 一般现在时(arrive表将来)，主句用将来完成时。for two weeks 强调持续→完成进行也可，但选项中是will have stayed。2023年真题。"},
+{y:2022,q:"The manager told us that the project ______ by the end of this month.",o:["would be completed","will be completed","would have been completed","will have been completed"],a:2,e:"主句过去时(told)，从句将来→过去将来完成时(would have been done)。by the end of...是关键时间标志。"},
+{y:2021,q:"When I arrived at the cinema, the film ______ for ten minutes.",o:["had started","has been on","had been on","was starting"],a:2,e:"arrived过去时→电影在到达前已开始并持续→过去完成时。start是非延续性动词，不能用for ten minutes→用be on(延续性)。"},
+{y:2020,q:"The disease ______ widely in this area since the 1990s.",o:["has been spreading","is spreading","was spreading","had been spreading"],a:0,e:"since + 过去时间点 → 现在完成(进行)时。spread 延续至今并可能继续→完成进行时更佳。"},
+{y:2019,q:"Much of the carbon dioxide ______ by trees and plants.",o:["is absorbed","are absorbed","absorbs","absorb"],a:0,e:"被动语态。much of + 不可数名词(carbon dioxide)→谓语单数。be absorbed by 被...吸收。"},
+{y:2018,q:"She said she ______ the book twice already.",o:["has read","had read","was reading","would read"],a:1,e:"主句过去时(said)→宾语从句用过去完成时。already是完成时标志。twice也暗示完成。"},
+{y:2017,q:"The construction of the laboratory ______ by the end of next month.",o:["must complete","must have completed","must be completed","must have been completed"],a:3,e:"by the end of next month将来时间+被动→将来完成时的被动。must have been done = 到那时一定已完成。"},
+{y:2016,q:"How can I ever concentrate if you ______ continually ______ me with silly questions?",o:["have...interrupted","had...interrupted","are...interrupting","were...interrupting"],a:2,e:"continually + 进行时 表厌烦情绪。主句现在时(can)→从句现在进行时(are...interrupting)。"},
+{y:2015,q:"He ______ articles for our newspaper for two years and he has written about twenty articles.",o:["has been writing","had been writing","is writing","was writing"],a:0,e:"过去持续到现在(可能继续)→现在完成进行时。后文has written提示现在时间参照点。"},
+{y:2014,q:"All the tasks ______ ahead of time, they decided to go on holiday.",o:["had been finished","were finished","having been finished","have been finished"],a:2,e:"独立主格结构。tasks与finish是被动关系+先于decided发生→having been done。非完整句子，不能选谓语形式。"}
+]},
+{id:'subjunctive',title:'虚拟语气',desc:'if条件句虚拟、名词性从句虚拟及wish/would rather等特殊句型',content:`
+<h3>虚拟语气 (Subjunctive Mood)</h3>
+<p>虚拟语气表示<strong>假设、愿望、建议</strong>等非真实情况，是专四语法选择题的<strong>必考点</strong>（每年 2-3 题）。</p>
+
+<h4>一、if 条件句中的虚拟</h4>
+<table><tr><th>时间</th><th>从句谓语形式</th><th>主句谓语形式</th></tr>
+<tr><td>与现在相反</td><td>did / were</td><td>would / could / might / should + do</td></tr>
+<tr><td>与过去相反</td><td>had done</td><td>would / could / might / should + have done</td></tr>
+<tr><td>与将来相反</td><td>did / were / were to do / should do</td><td>would / could / might / should + do</td></tr></table>
+<div class="ex-box"><div class="en">If I <strong>were</strong> you, I <strong>would accept</strong> the offer. (与现在相反)</div></div>
+<div class="ex-box"><div class="en">If he <strong>had studied</strong> harder, he <strong>would have passed</strong>. (与过去相反)</div></div>
+<div class="ex-box"><div class="en">If it <strong>were to rain</strong> tomorrow, the match <strong>would be postponed</strong>. (与将来相反)</div></div>
+
+<div class="tip"><span class="ti">✦</span><div><strong>混合时间虚拟（错综条件句）：</strong>从句和主句时间不一致时各自按各自时间规则变化。<br>如：If I <strong>had studied</strong> harder (过去), I <strong>would be</strong> a college student now (现在).<br><strong>省略 if 的倒装：</strong>Had I known = If I had known; Were I you = If I were you.</div></div>
+
+<h4>二、名词性从句中的虚拟（专四高频！）</h4>
+<p>表示<strong>建议、命令、要求、愿望</strong>等动词后的宾语从句，谓语用 <code>(should) + 动词原形</code>。</p>
+<p>常见动词：<span class="highlight">suggest, insist, order, command, demand, require, request, propose, recommend, advise, urge, prefer, move(动议), vote(投票建议)</span></p>
+<p>常见形容词：<span class="highlight">necessary, important, essential, vital, imperative, desirable, advisable, strange, natural</span></p>
+<div class="ex-box"><div class="en">The doctor suggested that he <strong>(should) give up</strong> smoking.</div></div>
+<div class="ex-box"><div class="en">It is essential that every child <strong>(should) have</strong> equal access to education.</div></div>
+
+<div class="warn"><span class="wi">⚠</span><div><strong>注意区分：</strong>suggest 表示"暗示、表明"，insist 表示"坚持认为（事实）"时，<strong>不用虚拟语气</strong>！<br>如：His pale face suggested that he <strong>was</strong> ill. （暗示他生病，用正常时态）<br>He insisted that he <strong>was</strong> innocent. （坚持认为自己无辜，事实陈述）</div></div>
+
+<h4>三、其他重要虚拟句型</h4>
+<p><strong>1. wish / if only + 虚拟</strong></p>
+<table><tr><th>时间</th><th>谓语形式</th><th>例句</th></tr>
+<tr><td>现在愿望（不能实现）</td><td>did / were</td><td>I wish I <strong>were</strong> taller.</td></tr>
+<tr><td>过去愿望（已发生）</td><td>had done</td><td>I wish I <strong>had taken</strong> your advice.</td></tr>
+<tr><td>将来愿望（不太可能）</td><td>would / could + do</td><td>I wish it <strong>would stop</strong> raining.</td></tr></table>
+
+<p><strong>2. It is (high / about) time that...</strong> 从句用 <code>did / were</code> 或 <code>should do</code>（should不可省略时少见）</p>
+
+<p><strong>3. would rather / would sooner / would just as soon + 从句</strong></p>
+<div class="ex-box"><div class="en">I'd rather you <strong>stayed</strong> at home now.（现在/将来 → 过去式）</div></div>
+<div class="ex-box"><div class="en">I'd rather you <strong>hadn't told</strong> him the truth.（过去 → had done）</div></div>
+
+<p><strong>4. as if / as though</strong> 从句虚拟</p>
+<p><strong>5. lest / for fear that / in case</strong> + (should) do</p>
+`,practice:[
+{q:"If I ______ you, I would not let him go.",o:["am","was","were","be"],a:2,e:"与现在相反的虚拟条件句，be 动词一律用 were（不管主语人称）。"},
+{q:"The teacher suggested that every student ______ a plan for the semester.",o:["makes","made","make","would make"],a:2,e:"suggest 表「建议」时，宾语从句用 (should) do，should 可省略。"},
+{q:"His pale face suggested that he ______ ill.",o:["be","should be","was","were"],a:2,e:"suggest 此处意为「暗示」，不用虚拟语气，he was ill 用正常时态。"},
+{q:"I wish I ______ to the concert with you last night.",o:["went","had gone","would go","have gone"],a:1,e:"wish 后的从句表达与过去事实相反的愿望（last night），用过去完成时 had done。"},
+{q:"It is high time that the government ______ measures to protect the environment.",o:["takes","took","has taken","will take"],a:1,e:"It is high time that... 句型中从句用一般过去时（or should do）。"}
+],pastExam:[
+{y:2023,q:"It is essential that every child ______ equal access to education.",o:["has","have","had","will have"],a:1,e:"It is essential that... 主语从句用虚拟 (should) do。should可省略→have。2023真题。"},
+{y:2022,q:"If I had known about the traffic jam, I ______ a different route.",o:["would take","would have taken","took","had taken"],a:1,e:"与过去相反的条件句→主句 would have done。"},
+{y:2021,q:"The doctor recommended that the patient ______ in the hospital for another week.",o:["stay","stays","stayed","would stay"],a:0,e:"recommend表建议→宾语从句用(should) do。should省略→stay。"},
+{y:2020,q:"Her look suggested that she ______ the news already.",o:["know","knew","had known","should know"],a:2,e:"suggest=暗示(非建议)→不用虚拟。already+过去背景→had known。"},
+{y:2019,q:"I would rather you ______ the truth at that time.",o:["told","have told","had told","would tell"],a:2,e:"would rather从句表过去( at that time)→had done。"},
+{y:2018,q:"If only I ______ more time to prepare for the exam!",o:["had","have","had had","would have"],a:2,e:"if only与过去相反→had done。对已发生的考试表示遗憾。"},
+{y:2017,q:"He insisted that he ______ nothing wrong and that he ______ set free.",o:["had done; be","did; was","do; should be","did; be"],a:0,e:"第一个insist=坚持认为(事实)→不用虚拟用had done；第二个=坚持要求→虚拟(should) be。"},
+{y:2016,q:"______ for your timely help, I would not have finished the task.",o:["Had it not been","If it had been","Were it not","If it were not"],a:0,e:"与过去相反省略if→倒装。原语序: If it had not been for... → Had it not been for..."},
+{y:2015,q:"It's about time that you ______ to settle down.",o:["begin","began","have begun","will begin"],a:1,e:"It's about/high time that...从句用过去式(began)。"},
+{y:2014,q:"He talks as if he ______ everything about the project.",o:["knows","knew","had known","would know"],a:1,e:"as if与现在事实相反→过去式knew(主句talks是一般现在时)。"}
+]},
+{id:'nonfinite',title:'非谓语动词',desc:'不定式、动名词、分词三大非谓语形式的用法、区别及解题技巧',content:`
+<h3>非谓语动词 (Non-finite Verbs)</h3>
+<p>非谓语动词是专四<strong>每年必考 2-4 题</strong>的核心考点。包括三种形式：<strong>不定式 (to do)</strong>、<strong>动名词 (doing)</strong> 和<strong>分词 (doing / done)</strong>。</p>
+<p><strong>核心解题思路：</strong>①判断非谓语与逻辑主语的关系——主动/被动？②判断非谓语与谓语动词的时间先后——同时/之前？</p>
+
+<h4>一、不定式 (to do) vs 动名词 (doing) 作宾语</h4>
+<table><tr><th>接不定式 to do 的动词</th><th>接动名词 doing 的动词</th></tr>
+<tr><td>agree, decide, hope, plan, promise, refuse, want, wish, expect, pretend, manage, afford, offer, attempt, fail</td><td>avoid, consider, delay, deny, enjoy, finish, imagine, mind, miss, practice, risk, suggest, admit, appreciate, postpone, can't help</td></tr></table>
+
+<p><strong>接 to do 和 doing 意义不同的动词（专四高频！）：</strong></p>
+<table><tr><th>动词</th><th>+ to do</th><th>+ doing</th></tr>
+<tr><td>remember</td><td>记得要做（未做）</td><td>记得做过（已做）</td></tr>
+<tr><td>forget</td><td>忘记要做（未做）</td><td>忘记做过（已做）</td></tr>
+<tr><td>regret</td><td>遗憾地要做（to tell/to say）</td><td>后悔做过</td></tr>
+<tr><td>stop</td><td>停下来去做另一件事</td><td>停止正在做的事</td></tr>
+<tr><td>try</td><td>努力做</td><td>尝试做</td></tr>
+<tr><td>mean</td><td>打算做</td><td>意味着</td></tr>
+<tr><td>go on</td><td>接着做另一件事</td><td>继续做同一件事</td></tr>
+<tr><td>can't help</td><td>不能帮忙做</td><td>忍不住做</td></tr></table>
+
+<h4>二、分词作状语（专四最高频考点！）</h4>
+<p>分词作状语时，其<strong>逻辑主语必须与主句主语一致</strong>。主动关系→doing；被动关系→done；先于谓语动词发生→having done / having been done。</p>
+<div class="ex-box"><div class="en"><strong>Seeing</strong> from the top of the hill, we found the city beautiful.（we 主动 see）</div></div>
+<div class="ex-box"><div class="en"><strong>Seen</strong> from the top of the hill, the city looks beautiful.（city 被 see）</div></div>
+
+<div class="warn"><span class="wi">⚠</span><div><strong>垂悬分词 (Dangling Participle) 是专四常见错误选项！</strong>分词逻辑主语必须与主句主语一致。<br>❌ Walking down the street, a car hit him. （车在走路？）<br>✓ Walking down the street, he was hit by a car.</div></div>
+
+<h4>三、非谓语动词的时态和语态总表</h4>
+<table><tr><th>形式</th><th>不定式</th><th>动名词</th><th>现在分词</th></tr>
+<tr><td>一般式主动</td><td>to do</td><td>doing</td><td>doing</td></tr>
+<tr><td>一般式被动</td><td>to be done</td><td>being done</td><td>being done</td></tr>
+<tr><td>完成式主动</td><td>to have done</td><td>having done</td><td>having done</td></tr>
+<tr><td>完成式被动</td><td>to have been done</td><td>having been done</td><td>having been done</td></tr></table>
+
+<h4>四、独立主格结构</h4>
+<p>非谓语动词带有自己的逻辑主语，与主句主语不同，构成独立主格结构。</p>
+<div class="ex-box"><div class="en"><strong>Weather permitting</strong>, we will go for a picnic.（weather 主动 permit）</div></div>
+<div class="ex-box"><div class="en"><strong>All things considered</strong>, it's a good plan.（all things 被 consider）</div></div>
+`,practice:[
+{q:"I regret ______ you that your application has been rejected.",o:["telling","to tell","tell","told"],a:1,e:"regret to do = 遗憾地要做某事（告知坏消息）；regret doing = 后悔做过某事。"},
+{q:"______ from space, the earth looks like a blue marble.",o:["Seeing","To see","Seen","Having seen"],a:2,e:"主语 the earth 是「被看」的对象，用过去分词 Seen 作状语表被动。"},
+{q:"He narrowly avoided ______ by the falling tree.",o:["being hit","hitting","to be hit","having hit"],a:0,e:"avoid + doing；主语 he 被树砸到→被动 being done。"},
+{q:"______ the final exam, he felt extremely relieved.",o:["Finished","Having finished","To finish","Being finished"],a:1,e:"完成考试发生在 felt relieved 之前，用 Having finished 表示主动+先时性。"},
+{q:"The manager promised ______ the issue at the next meeting.",o:["discussing","to discuss","discuss","having discussed"],a:1,e:"promise 后接不定式 to do。"}
+],pastExam:[
+{y:2023,q:"______ by the beautiful scenery, the tourists stopped to take photos.",o:["Attracting","Attracted","To attract","Having attracted"],a:1,e:"tourists被景色吸引→过去分词Attracted作状语。2023真题。"},
+{y:2022,q:"The problem is worth ______ at the next meeting.",o:["discussing","to discuss","discuss","being discussed"],a:0,e:"be worth + doing (主动形式表被动含义)。= be worthy of being discussed / to be discussed。"},
+{y:2021,q:"______ enough time, I would have done it better.",o:["Giving","To give","Given","Having given"],a:2,e:"I 被给予时间→过去分词Given作状语(= If I had been given...)。"},
+{y:2020,q:"The manager has decided ______ the production plan.",o:["changing","to change","change","changed"],a:1,e:"decide + to do。常见接不定式的动词之一。"},
+{y:2019,q:"I remember ______ to the party, but I am not sure if I actually went.",o:["inviting","to invite","being invited","having invited"],a:2,e:"remember+doing记得做过。我被邀请→被动being done。went提示是过去的事。"},
+{y:2018,q:"With all the problems ______, the director felt a sense of relief.",o:["solved","solving","to solve","to have solved"],a:0,e:"with复合结构：problems被解决→过去分词solved作宾补。all the problems与solve是被动关系。"},
+{y:2017,q:"People tend ______ more when they are under stress.",o:["eating","to eat","eaten","eat"],a:1,e:"tend + to do 倾向于做某事。固定搭配。"},
+{y:2016,q:"The ______ child was finally found in the park.",o:["losing","lost","having lost","being lost"],a:1,e:"lost作定语修饰child，表示'走失的'。单个过去分词作前置定语。"},
+{y:2015,q:"He spent the whole afternoon ______ for the exam.",o:["prepare","preparing","to prepare","prepared"],a:1,e:"spend time + (in) doing。固定用法。"},
+{y:2014,q:"______ a satisfactory solution, the committee decided to put off the meeting.",o:["Not having reached","Not reaching","Not reached","Not to reach"],a:0,e:"先'未达成'后'推迟'→先时性用having done。否定式Not要放在前面。"}
+]},
+{id:'inversion',title:'倒装与强调',desc:'完全倒装、部分倒装及强调句型',content:`<h3>倒装与强调</h3><h4>一、完全倒装</h4><p>方位副词(here,there,out,in,up,down,away)置句首，主语非人称代词时完全倒装。</p><div class="ex-box"><div class="en">Here <strong>comes</strong> the bus. / Out <strong>rushed</strong> the children.</div></div><div class="warn"><span class="wi">⚠</span><div>人称代词主语不倒装：Here <strong>he</strong> comes. ✓</div></div><h4>二、部分倒装（必考！）</h4><table><tr><th>触发词/结构</th><th>例句</th></tr><tr><td>否定词/短语置句首never,seldom,rarely,hardly,little,by no means,under no circumstances,at no time</td><td><strong>Never have</strong> I seen such beauty.<br><strong>Under no circumstances should</strong> you open that door.</td></tr><tr><td>Not only...but also...</td><td><strong>Not only did</strong> he finish, but he also helped.</td></tr><tr><td>Hardly...when.../No sooner...than.../Scarcely...when...</td><td><strong>Hardly had</strong> I sat down <strong>when</strong> the phone rang.</td></tr><tr><td>So...that.../Such...that...</td><td><strong>So fast does</strong> light travel that...</td></tr><tr><td>Only+状语置句首</td><td><strong>Only in this way can</strong> we solve it.</td></tr><tr><td>Not until...</td><td><strong>Not until</strong> yesterday <strong>did</strong> I know it.</td></tr><tr><td>as/though引导让步状语从句</td><td>Child <strong>as</strong> he is, he knows a lot.</td></tr></table><div class="warn"><span class="wi">⚠</span><div>only+主语时不倒装：Only he knows the answer.</div></div><h4>三、强调句型</h4><p><strong>1. It is/was+被强调部分+that/who+其余</strong><br><strong>2. do/does/did+动词原形</strong>强调谓语<br>判断法：去掉It is/was...that...后句子仍完整→强调句</p>`,practice:[{q:"Not until the meeting was over ______ that he had made a mistake.",o:["did he realize","he realized","had he realized","he had realized"],a:0,e:"Not until置句首→主句部分倒装。"},{q:"Child ______ he is, he knows a lot about programming.",o:["as","though","although","despite"],a:0,e:"名词+as+主语+be表让步。注意名词前不用冠词。"},{q:"It was in the library ______ I met Professor Zhang.",o:["where","that","which","when"],a:1,e:"强调句型用that。非定语从句（不用where）。"},{q:"Hardly ______ the airport when the plane took off.",o:["I had reached","did I reach","had I reached","I reached"],a:2,e:"Hardly...when→过去完成时倒装。"},{q:"Only by working together ______ achieve the goal.",o:["we can","can we","we will","do we"],a:1,e:"Only+方式状语置句首→部分倒装。"}],pastExam:[{y:2023,q:"Not only ______ a promise, but he also kept it.",o:["did he make","he made","had he made","he had made"],a:0,e:"Not only...but also...句首→前半部分倒装 did he make。"},{y:2022,q:"Under no circumstances ______ the rules of the laboratory.",o:["should you break","you should break","you broke","do you break"],a:0,e:"Under no circumstances(否定短语)→倒装 should you break。"},{y:2021,q:"______ the importance of environmental protection that the government has taken actions.",o:["So great is","Such great is","So great was","Such is"],a:0,e:"So+adj.置句首→倒装。So great is the importance...that..."},{y:2020,q:"It was not until she had finished all her work ______ home.",o:["that she went","when she went","did she go","then she went"],a:0,e:"强调句型 It was not until...that...，不倒装。"},{y:2019,q:"Only when the war was over ______ to his hometown.",o:["did he return","he returned","had he returned","he had returned"],a:0,e:"Only+状语从句置句首→主句倒装 did he return。"},{y:2018,q:"______ got on the train when it began to move.",o:["No sooner had I","No sooner I had","Hardly I had","Scarcely I had"],a:0,e:"No sooner...than倒装句：No sooner had I + done...than..."},{y:2017,q:"It is not intelligence but hard work ______ matters.",o:["that","which","what","who"],a:0,e:"强调句型 It is...that...。被强调部分含not...but...结构。"},{y:2016,q:"______ you were here, I would have called you immediately.",o:["Had I known","If I know","I had known","Did I know"],a:0,e:"与过去相反虚拟条件省略if→倒装：Had I known = If I had known。"},{y:2015,q:"Little ______ that he was seriously ill.",o:["did we know","we knew","we did know","knew we"],a:0,e:"Little否定词置句首→倒装 did we know。"},{y:2014,q:"It was in 2010 ______ he graduated from university.",o:["that","when","which","in which"],a:0,e:"强调句型It was...that...，非定语从句。"}]},{id:'clauses',title:'三大从句',desc:'名词性从句、定语从句、状语从句详解',content:`<h3>三大从句</h3><h4>一、名词性从句</h4><p>包括主语从句、宾语从句、表语从句、同位语从句。引导词：that, whether/if, wh-词。<br>主语/表语/同位语从句中that不可省略。<br>介词后只用whether不用if。</p><h4>二、定语从句（重点！）</h4><p><strong>只用that的情况：</strong>最高级/序数词/the only/the very修饰；all/everything/nothing等不定代词先行词；既有人又有物；who/which开头的疑问句。</p><p><strong>as vs which：</strong>as可放句首指代整个主句("正如")；which只能放句末。</p><p><strong>介词+which/whom：</strong>正式用法。介词的选择取决于从句动词搭配。</p><h4>三、状语从句</h4><table><tr><th>类型</th><th>常见连词</th></tr><tr><td>时间</td><td>when,while,as,before,after,until,since,as soon as</td></tr><tr><td>原因</td><td>because,since,as,now that</td></tr><tr><td>条件</td><td>if,unless,as long as,provided that</td></tr><tr><td>让步</td><td>although,though,even if,while,as</td></tr><tr><td>目的</td><td>so that,in order that</td></tr><tr><td>结果</td><td>so...that,such...that</td></tr></table>`,practice:[{q:"The reason ______ he was late was ______ his car broke down.",o:["why; that","that; why","why; because","that; that"],a:0,e:"reason后定语从句用why；表语从句用that（不用because）。"},{q:"This is the best film ______ I have ever seen.",o:["which","that","what","as"],a:1,e:"先行词有最高级the best修饰→只用that。"},{q:"______ is often the case, he arrived late again.",o:["Which","That","As","What"],a:2,e:"as引导非限制性定语从句，可置句首。which只能放句末。"},{q:"The news ______ our team won excited everyone.",o:["which","that","what","when"],a:1,e:"同位语从句(news=our team won)→用that。"}],pastExam:[{y:2023,q:"The professor, together with his students, ______ the laboratory now.",o:["are visiting","is visiting","visit","have visited"],a:1,e:"together with→就远原则，与professor一致→单数。"},{y:2022,q:"______ the meeting will be held is still under discussion.",o:["That","When","What","Which"],a:1,e:"主语从句缺少时间状语→When。"},{y:2021,q:"There are many students ______ want to join the club.",o:["who","which","whom","they"],a:0,e:"定语从句修饰students(人+主语)→who。"},{y:2020,q:"The fact ______ smoking is harmful to health is well known.",o:["which","what","that","for which"],a:2,e:"同位语从句→that。"},{y:2019,q:"I was about to leave ______ it started to rain.",o:["while","when","as","after"],a:1,e:"be about to...when...固定句型。"},{y:2018,q:"The reason for his absence is ______ he was ill.",o:["because","that","why","for"],a:1,e:"reason表语从句用that引导，不用because。"},{y:2017,q:"______ is known to all, the moon travels around the earth.",o:["As","Which","That","It"],a:0,e:"As引导非限制性定语从句，置句首。"},{y:2016,q:"She is the only one of the girls who ______ French.",o:["speak","speaks","has spoken","have spoken"],a:1,e:"the only one of+复数→定语从句修饰one→单数。"},{y:2015,q:"He didn't tell me the place ______ he would meet her.",o:["which","that","where","when"],a:2,e:"定语从句缺少地点状语→where(=at which)。"},{y:2014,q:"______ breaks the law will be punished.",o:["Whoever","Who","No matter who","Anyone"],a:0,e:"主语从句用Whoever(=Anyone who)。"}]},{id:'agreement',title:'主谓一致',desc:'语法一致、意义一致、就近原则',content:`<h3>主谓一致</h3><table><tr><th>主语类型</th><th>谓语</th><th>例句</th></tr><tr><td>each/every+单名</td><td>单数</td><td>Each student has a book.</td></tr><tr><td>many a/more than one+单名</td><td>单数</td><td>Many a student likes it.</td></tr><tr><td>a number of+复名</td><td>复数</td><td>A number of students are here.</td></tr><tr><td>the number of+复名</td><td>单数</td><td>The number is 50.</td></tr><tr><td>the+adj.(一类人)</td><td>复数</td><td>The rich are not always happy.</td></tr><tr><td>together with/as well as</td><td>就远原则</td><td>Tom, with his friends, is going.</td></tr><tr><td>either...or/neither...nor</td><td>就近原则</td><td>Neither he nor I am wrong.</td></tr><tr><td>分数+of+名词</td><td>看名词</td><td>Two-thirds of water is / students are</td></tr><tr><td>集合名词(family/team/class)</td><td>看语境</td><td>整体→单数；个体→复数</td></tr></table>`,practice:[{q:"The number of students ______ increasing every year.",o:["are","is","were","have been"],a:1,e:"the number of+复名→单数谓语。"},{q:"Many a student ______ made the same mistake.",o:["have","has","are","were"],a:1,e:"many a+单名→单数谓语。"},{q:"Neither the teacher nor the students ______ satisfied.",o:["is","was","are","has been"],a:2,e:"neither...nor就近原则→students复数→are。"},{q:"The professor, as well as his assistants, ______ the experiment.",o:["conduct","conducts","are conducting","have conducted"],a:1,e:"as well as就远原则→professor单数→conducts。"}],pastExam:[{y:2022,q:"The number of people invited ______ fifty, but a number of them ______ absent.",o:["were; was","was; were","was; was","were; were"],a:1,e:"the number单数was; a number of复数were。"},{y:2020,q:"Every man and every woman ______ the right to vote.",o:["have","has","are having","were having"],a:1,e:"every...and every...→单数谓语has。"},{y:2018,q:"Neither of the two answers ______ correct.",o:["are","is","were","have been"],a:1,e:"neither of+复名→单数谓语is。"},{y:2016,q:"The police ______ the case for three months.",o:["has investigated","have been investigating","is investigating","was investigating"],a:1,e:"police复数意义→have。for three months→完成进行。"}]},{id:'articles',title:'冠词',desc:'定冠词、不定冠词及零冠词',content:`<h3>冠词</h3><h4>不定冠词a/an</h4><p>第一次提及、泛指一类、抽象名词具体化(a pleasure)、固定搭配(have a cold)。<br>a vs an：看发音元音/辅音（an hour, a university）。</p><h4>定冠词the</h4><p>特指上文提及的；独一无二的(sun,moon)；序数词/最高级前；乐器前(play the piano)；the+adj.(一类人)；江河湖海山脉沙漠；普通名词构成的专有名词(the UN)。</p><h4>零冠词</h4><p>不可数/复数泛指；三餐/球类/学科；节日；称呼头衔(President)；by+交通(by bus)。</p><div class="warn"><span class="wi">⚠</span><div>有无冠词意义不同：in front of(外部前) vs in the front of(内部前)；go to school(上学) vs go to the school(去那所学校)。</div></div>`,practice:[{q:"He plays ______ piano but can't play ______ basketball.",o:["/; /","the; /","the; the","/; the"],a:1,e:"乐器前加the，球类前不加冠词。"},{q:"______ Yellow River is ______ second longest river in China.",o:["The; the","/; the","The; a","/; a"],a:0,e:"河流前加the；序数词前加the。"},{q:"We usually have ______ lunch at 12 o'clock.",o:["a","the","an","/"],a:3,e:"三餐前不加冠词。"}],pastExam:[{y:2023,q:"He was elected ______ chairman of the committee.",o:["a","the","an","/"],a:3,e:"头衔/职位前不加冠词。"},{y:2021,q:"What ______ pity that you can't come!",o:["a","the","/","an"],a:0,e:"What a pity!固定表达。"},{y:2019,q:"They are paid by ______ hour.",o:["a","the","an","/"],a:1,e:"by the hour按小时计。by the+单位名词。"},{y:2017,q:"______ more I know him, ______ more I respect him.",o:["The; the","/; /","A; a","The; /"],a:0,e:"the more...the more...固定句型。"}]},{id:'prepositions',title:'介词',desc:'易混介词辨析及常考固定搭配',content:`<h3>介词</h3><h4>易混介词</h4><table><tr><th>介词</th><th>区别</th></tr><tr><td>at/in/on(地点)</td><td>at点; in范围; on表面</td></tr><tr><td>at/in/on(时间)</td><td>at时刻; in时间段; on具体天</td></tr><tr><td>in/after(时间)</td><td>in+时间段(将来); after+时间段(过去)</td></tr><tr><td>between/among</td><td>between两者; among三者+</td></tr><tr><td>except/besides</td><td>except排除; besides包括</td></tr><tr><td>across/through</td><td>across表面; through空间穿过</td></tr></table><h4>高频搭配</h4><p>key/solution/approach/answer <strong>to</strong>; depend <strong>on</strong>; insist <strong>on</strong>; succeed <strong>in</strong>; belong <strong>to</strong>; prevent...<strong>from</strong>; be familiar <strong>with</strong>(某人对...熟悉)/<strong>to</strong>(...对某人熟悉); be absent <strong>from</strong>; congratulate <strong>on</strong></p>`,practice:[{q:"The key ______ success is hard work.",o:["of","for","to","in"],a:2,e:"key to... ...的关键。"},{q:"He will be back ______ two hours.",o:["after","in","within","for"],a:1,e:"将来时+in+时间段=...之后。"},{q:"Everyone went ______ John, who was ill.",o:["besides","except","except for","as well as"],a:1,e:"except排除。besides包括。"}],pastExam:[{y:2023,q:"He has an advantage ______ other candidates.",o:["over","than","to","against"],a:0,e:"advantage over...相对于...的优势。"},{y:2021,q:"The picture reminds me ______ my childhood.",o:["of","to","about","in"],a:0,e:"remind sb. of sth.使某人想起。"},{y:2019,q:"Are you familiar ______ the local customs?",o:["to","with","for","about"],a:1,e:"be familiar with某人对...熟悉。"},{y:2017,q:"He was absent ______ school because of illness.",o:["in","at","from","to"],a:2,e:"be absent from缺席。"},{y:2015,q:"Congratulations ______ your promotion!",o:["for","on","to","with"],a:1,e:"congratulations on...祝贺。"}]},{id:'modals',title:'情态动词',desc:'推测用法及have done结构',content:`<h3>情态动词</h3><h4>一、表推测</h4><table><tr><th>可能性</th><th>对现在/将来</th><th>对过去</th></tr><tr><td>肯定</td><td>must do</td><td>must have done</td></tr><tr><td>很可能</td><td>should/ought to do</td><td>should/ought to have done</td></tr><tr><td>可能</td><td>may/might/could do</td><td>may/might/could have done</td></tr><tr><td>不可能</td><td>can't/couldn't do</td><td>can't/couldn't have done</td></tr></table><h4>二、"情态动词+have done"专四核心考点</h4><table><tr><th>结构</th><th>含义</th></tr><tr><td>must have done</td><td>一定做过(过去肯定推测)</td></tr><tr><td>can't/couldn't have done</td><td>不可能做过</td></tr><tr><td>may/might have done</td><td>可能做过</td></tr><tr><td>could have done</td><td>本可做而未做</td></tr><tr><td>should/ought to have done</td><td>本应做而未做</td></tr><tr><td>shouldn't have done</td><td>本不该做却做了</td></tr><tr><td>needn't have done</td><td>本不必做却做了</td></tr></table><p>shall用于二/三人称表命令、威胁、允诺。used to(过去状态+习惯)vs would(仅重复动作非状态)。</p>`,practice:[{q:"You ______ me earlier. I could have helped you.",o:["should tell","should have told","must tell","could tell"],a:1,e:"should have done本应做而未做。"},{q:"The road is wet. It ______ last night.",o:["must rain","must have rained","should rain","should have rained"],a:1,e:"对过去肯定推测→must have done。"},{q:"He ______ the exam, for he looked so happy.",o:["can't have passed","must have passed","should have passed","could have passed"],a:1,e:"根据高兴推断→must have passed。"}],pastExam:[{y:2023,q:"You ______ the meeting. It was really important.",o:["shouldn't have missed","mustn't miss","can't have missed","needn't miss"],a:0,e:"本不该缺席→shouldn't have done。"},{y:2022,q:"From what you say, he ______ the truth already.",o:["must know","must have known","should know","can know"],a:1,e:"already+语境→must have known。"},{y:2020,q:"He ______ his homework, for his desk was empty.",o:["must finish","must have finished","should finish","could finish"],a:1,e:"was empty提示过去→must have done。"},{y:2019,q:"You ______ him. He was at home all day.",o:["could have seen","couldn't have seen","should have seen","must have seen"],a:1,e:"He was at home→不可能见过→couldn't have seen。"},{y:2018,q:"I ______ him the money. He never paid me back.",o:["shouldn't lend","mustn't have lent","shouldn't have lent","couldn't have lent"],a:2,e:"后悔不该借钱→shouldn't have done。"},{y:2017,q:"You needn't ______ all the way here. I could have met you at the station.",o:["come","came","have come","to come"],a:2,e:"needn't have done本不必做却做了。"}]},{id:'comparison',title:'比较结构',desc:'比较级、最高级及特殊比较句型',content:`<h3>比较结构</h3><table><tr><th>结构</th><th>例句</th></tr><tr><td>as+原级+as</td><td>He is as tall as his father.</td></tr><tr><td>not so/as+原级+as</td><td>He is not so clever as his brother.</td></tr><tr><td>比较级+than</td><td>She is taller than me.</td></tr><tr><td>the+比较级,the+比较级</td><td>The more you read, the better.</td></tr><tr><td>比较级+and+比较级</td><td>colder and colder</td></tr></table><p><strong>倍数表达：</strong>倍数+as...as / 倍数+比较级+than / 倍数+the size/length of<br><strong>比较中替代：</strong>单数/不可数→that；复数→those<br><strong>no more than(=only仅仅) vs not more than(不超过)<br>more...than 与其说...不如说</strong></p>`,practice:[{q:"The population of China is larger than ______ of Japan.",o:["one","that","those","ones"],a:1,e:"不可数名词用that替代。"},{q:"The harder you work, ______ progress you will make.",o:["the more","more","the most","most"],a:0,e:"the+比较级,the+比较级。"},{q:"This box is five times ______ that one.",o:["as heavy as","as heavy than","heavier as","heavy as"],a:0,e:"倍数+as+原级+as。"}],pastExam:[{y:2022,q:"The house rent is higher than ______ in the countryside.",o:["that","one","those","ones"],a:0,e:"rent不可数→that替代。"},{y:2020,q:"John is ______ of the two brothers.",o:["the taller","taller","the tallest","tallest"],a:0,e:"两者中较...用the+比较级。"},{y:2018,q:"He is ______ than his brother.",o:["more hardworking","the more hardworking","most hardworking","more hardworkinger"],a:0,e:"多音节词比较级→more+原级。"},{y:2016,q:"This room is twice ______ that one.",o:["the size of","as large than","larger of","size of"],a:0,e:"倍数+the+名词+of。"}]},{id:'pronouns',title:'代词',desc:'不定代词、反身代词及替代词',content:`<h3>代词</h3><table><tr><th>代词</th><th>用法</th></tr><tr><td>both/either/neither</td><td>both两者都; either两者之一; neither两者都不</td></tr><tr><td>all/none</td><td>all三者+; none三者+都不</td></tr><tr><td>other/others/the other/another</td><td>other+n.其他的; others=other+n.; the other(两者)另一个; another(三者+)另一个</td></tr><tr><td>nothing but / anything but</td><td>nothing but=only仅仅; anything but=not at all根本不</td></tr></table>`,practice:[{q:"I have two brothers. One is a teacher, and ______ is a doctor.",o:["another","the other","other","others"],a:1,e:"两者中一个...另一个=one...the other。"},{q:"He is ______ but a child. Don't take it seriously.",o:["anything","nothing","something","everything"],a:1,e:"nothing but=only仅仅。"},{q:"______ of the two answers is correct.",o:["Both","Either","Neither","None"],a:2,e:"两者都不→Neither。谓语is单数。"}],pastExam:[{y:2021,q:"Some people prefer tea; ______ prefer coffee.",o:["other","others","the other","another"],a:1,e:"others=other people泛指其他人。"},{y:2019,q:"I have three pens. One is red, ______ are blue.",o:["the others","others","another","the other"],a:0,e:"三者+其余全部→the others。"},{y:2017,q:"He is anything ______ a fool.",o:["but","except","besides","and"],a:0,e:"anything but=not at all根本不。"}]},{id:'adjadv',title:'形容词与副词',desc:'形容词排序、形近副词、表语形容词',content:`<h3>形容词与副词</h3><h4>一、形近副词辨析</h4><table><tr><th>无-ly（具体）</th><th>有-ly（抽象）</th></tr><tr><td>high 高地</td><td>highly 高度地，非常</td></tr><tr><td>deep 深地</td><td>deeply 深深地(情感)</td></tr><tr><td>wide 宽地</td><td>widely 广泛地</td></tr><tr><td>close 接近地</td><td>closely 仔细地；密切地</td></tr><tr><td>late 迟地</td><td>lately 最近</td></tr><tr><td>hard 努力地</td><td>hardly 几乎不</td></tr><tr><td>free 免费地</td><td>freely 自由地</td></tr></table><h4>二、a-开头表语形容词</h4><p>alive, asleep, awake, alone, alike, afraid, ashamed, aware, afloat →只作表语，不作前置定语。可说the baby is asleep，不能说an asleep baby→a sleeping baby。</p><h4>三、形容词排序</h4><p>限观形龄色国材：限定词→观点→大小→形状→年龄→颜色→国籍→材料</p>`,practice:[{q:"He was ______ praised for his courageous act.",o:["high","highly","tall","tallly"],a:1,e:"highly=高度地，非常(抽象)。"},{q:"I ______ had time to finish the test.",o:["hard","hardly","nearly","almost"],a:1,e:"hardly=almost not几乎不。"},{q:"He was the only person ______ at that late hour.",o:["awake","waking","waken","awaken"],a:0,e:"awake表语形容词'醒着的'。"}],pastExam:[{y:2023,q:"This kind of fruit is ______ found in tropical areas.",o:["wide","widely","wildly","wild"],a:1,e:"widely广泛地(抽象)。"},{y:2021,q:"He was ______ respected by his colleagues.",o:["high","highly","tall","deep"],a:1,e:"highly respected非常受尊敬。"},{y:2019,q:"I have been working too ______ lately.",o:["hard","hardly","heavy","heavily"],a:0,e:"work hard努力工作。lately=recently最近。"},{y:2017,q:"The ______ child was sleeping soundly.",o:["asleep","sleeping","slept","sleep"],a:1,e:"a-开头表语形容词不作前置定语→用sleeping。"}]},{id:'conjunctions',title:'连词与逻辑',desc:'并列连词、从属连词及逻辑衔接',content:`<h3>连词与逻辑</h3><h4>易混连词</h4><table><tr><th>对比</th><th>区别</th></tr><tr><td>while vs when vs as</td><td>while+延续/进行；when泛指时间点/段；as同时性/随着</td></tr><tr><td>because vs since vs as vs for</td><td>because最强(直接原因回答why)；since既然(已知原因)；as由于(弱)；for补充推断</td></tr><tr><td>unless vs if...not</td><td>unless=if...not，但不用于假设条件句</td></tr></table><p>常用逻辑连接词：转折(however, nevertheless, yet, on the contrary)；因果(therefore, consequently, as a result)；递进(moreover, furthermore, in addition)；举例(for example, such as)；总结(in conclusion, to sum up)</p>`,practice:[{q:"______ he is poor, he is honest and generous.",o:["Because","When","While","If"],a:2,e:"while表让步对比=although虽然。"},{q:"You won't succeed ______ you work harder.",o:["if","unless","when","because"],a:1,e:"unless=if...not除非/如果不。"},{q:"He must be ill, ______ he is absent today.",o:["because","since","as","for"],a:3,e:"for补充说明/推断原因。"}],pastExam:[{y:2022,q:"______ the task is difficult, they managed to complete it on time.",o:["While","Because","Since","If"],a:0,e:"While表让步=Although。"},{y:2020,q:"I'll go to the party ______ I am invited.",o:["unless","if","whether","provided that"],a:3,e:"provided that=if只要/如果。"},{y:2018,q:"He must be tired, ______ he has been working all day.",o:["because","for","since","as"],a:1,e:"for补充说明推断原因。"}]}]},{id:'vocab',icon:'◰',name:'词汇辨析',intro:'专四词汇题重点考查近义词辨析、形近词区分和固定搭配。每题15分，占比较大。',topics:[{id:'synonyms',title:'近义词辨析',desc:'高频近义词组的精确含义区分，含历年真题',content:`<h3>近义词辨析</h3><h4>1. "看"动词</h4><table><tr><th>动词</th><th>含义</th></tr><tr><td>see</td><td>看见（结果）；理解</td></tr><tr><td>look(at)</td><td>看（动作）；注意</td></tr><tr><td>watch</td><td>观看（动态、持续地）</td></tr><tr><td>glance(at)</td><td>一瞥，扫视（快速看）</td></tr><tr><td>stare(at)</td><td>凝视，瞪着眼看</td></tr><tr><td>gaze(at)</td><td>凝视（深情/沉思地）</td></tr><tr><td>glare(at)</td><td>怒视</td></tr><tr><td>glimpse</td><td>瞥见（强调结果）</td></tr></table><h4>2. rise/raise/arise/arouse</h4><table><tr><th>动词</th><th>及物</th><th>含义</th></tr><tr><td>rise(rose,risen)</td><td>vi.</td><td>上升；起身；增长</td></tr><tr><td>raise(raised)</td><td>vt.</td><td>举起；提高；养育；筹集</td></tr><tr><td>arise(arose,arisen)</td><td>vi.</td><td>出现；产生（问题/情况）</td></tr><tr><td>arouse(aroused)</td><td>vt.</td><td>唤醒；激起（兴趣/愤怒）</td></tr></table><h4>3. 高频形近词</h4><table><tr><th>词组</th><th>区别</th></tr><tr><td>continual/continuous</td><td>continual断断续续的; continuous连续不断的</td></tr><tr><td>economic/economical</td><td>经济的(宏观); 节约的</td></tr><tr><td>historic/historical</td><td>有历史意义的; 历史的(事实性)</td></tr><tr><td>imaginable/imaginary/imaginative</td><td>可想象的; 虚构的; 有想象力的</td></tr><tr><td>respectable/respectful/respective</td><td>可敬的; 尊敬的(对别人); 各自的</td></tr><tr><td>sensible/sensitive</td><td>明智的; 敏感的</td></tr><tr><td>principal/principle</td><td>主要的/校长; 原则</td></tr><tr><td>complement/compliment</td><td>补充; 赞美</td></tr><tr><td>stationary/stationery</td><td>静止的; 文具</td></tr><tr><td>assure/ensure/insure</td><td>assure sb. that使放心; ensure sth.确保; insure保险</td></tr><tr><td>affect/effect</td><td>affect v.影响; effect n.效果 v.实现</td></tr></table>`,practice:[{q:"The sun ______ in the east.",o:["rises","raises","arises","arouses"],a:0,e:"rise vi.上升。raise vt.举起。"},{q:"Pollution can seriously ______ people's health.",o:["effect","affect","affection","efficiency"],a:1,e:"affect v.影响。effect n.效果。"},{q:"She is very ______ to criticism.",o:["sensible","sensitive","sense","sensational"],a:1,e:"sensitive敏感的。sensible明智的。"},{q:"Please ______ me when you arrive at the airport.",o:["assure","ensure","insure","make sure"],a:1,e:"ensure+that/名词确保。assure+sb.使放心。"}],pastExam:[{y:2023,q:"The new policy is ______ to come into effect next month.",o:["likely","probable","possible","liable"],a:0,e:"be likely to do很可能。probable不能用于sb.is~to do。"},{y:2022,q:"He ______ his voice so that everyone could hear him.",o:["rose","raised","arose","aroused"],a:1,e:"raise one's voice提高嗓音(及物)。rise不及物。"},{y:2020,q:"She is very ______; she always makes wise decisions.",o:["sensitive","sensible","sensational","senseless"],a:1,e:"sensible明智的。sensitive敏感的。"},{y:2019,q:"It is difficult to ______ the long-term effects of this policy.",o:["anticipate","predict","forecast","foretell"],a:1,e:"predict预测(基于推理分析)。forecast预报(天气/经济)。"},{y:2018,q:"The scientist's discovery was of ______ importance.",o:["historic","historical","history","historian"],a:0,e:"historic有历史意义的(具有里程碑性质)。historical与历史相关的。"},{y:2017,q:"A good teacher should be able to ______ his students.",o:["motivate","encourage","inspire","stimulate"],a:2,e:"inspire激发灵感/热情。motivate给予动机。encourage鼓励。stimulate刺激。"},{y:2016,q:"These two concepts are closely ______ to each other.",o:["connected","linked","related","associated"],a:2,e:"be related to与...相关。be connected to与...连接。be associated with与...联系。"},{y:2015,q:"The company is taking measures to ______ the crisis.",o:["handle","deal","cope","resolve"],a:3,e:"resolve the crisis解决危机。handle/deal with/cope with处理。"}]},{id:'collocations',title:'固定搭配',desc:'高频短语动词及介词搭配',content:`<h3>固定搭配</h3><h4>高频短语动词</h4><table><tr><th>短语</th><th>含义</th><th>短语</th><th>含义</th></tr><tr><td>account for</td><td>解释；占比</td><td>come up with</td><td>想出（主意）</td></tr><tr><td>break down</td><td>出故障；分解</td><td>cut down on</td><td>减少</td></tr><tr><td>break up</td><td>分手；解散</td><td>figure out</td><td>弄清楚</td></tr><tr><td>bring about</td><td>引起，导致</td><td>get over</td><td>克服；恢复</td></tr><tr><td>call off</td><td>取消</td><td>give in(to)</td><td>屈服，让步</td></tr><tr><td>carry out</td><td>执行，实施</td><td>hold up</td><td>耽搁；支撑</td></tr><tr><td>come across</td><td>偶然遇到</td><td>keep up with</td><td>跟上</td></tr><tr><td>live up to</td><td>不辜负(期望)</td><td>look down on</td><td>看不起</td></tr><tr><td>look into</td><td>调查</td><td>make up for</td><td>弥补</td></tr><tr><td>put off</td><td>推迟</td><td>put up with</td><td>忍受</td></tr><tr><td>run into</td><td>偶遇；遭遇</td><td>run out of</td><td>用完，耗尽</td></tr><tr><td>take after</td><td>长得像(家人)</td><td>turn down</td><td>拒绝</td></tr><tr><td>turn out</td><td>结果是，证明是</td><td>work out</td><td>解决；锻炼</td></tr></table>`,practice:[{q:"I really ______ my father—we both love music.",o:["take after","take off","take over","take in"],a:0,e:"take after=resemble长得像/性格像。"},{q:"We have ______ sugar. Could you buy some?",o:["run out","run out of","run into","run over"],a:1,e:"run out of及物(+宾语)。run out不及物。"},{q:"The meeting has been ______ due to the bad weather.",o:["called off","called for","called on","called up"],a:0,e:"call off=cancel取消。"},{q:"It took him months to ______ the illness.",o:["get through","get over","get away","get off"],a:1,e:"get over从疾病/困难中恢复。"}],pastExam:[{y:2023,q:"We need to ______ a solution to this problem.",o:["come up with","put up with","keep up with","catch up with"],a:0,e:"come up with提出/想出(主意方案)。"},{y:2021,q:"The old building was ______ to make room for a new park.",o:["torn down","put down","taken down","set down"],a:0,e:"tear down=pull down拆除。"},{y:2019,q:"Don't ______ what he said. He was just joking.",o:["take...seriously","take...lightly","take...easy","take...for granted"],a:0,e:"take sth. seriously认真对待。"},{y:2017,q:"I can't ______ the noise anymore.",o:["put up with","come up with","keep up with","get on with"],a:0,e:"put up with=tolerate忍受。"}]}]},{id:'cloze',icon:'◈',name:'完形填空',intro:'综合考查词汇辨析、语法知识和篇章理解能力。专四固定题型。',topics:[{id:'cloze-skills',title:'完形填空技巧',desc:'解题步骤、考点分布和逻辑衔接词',content:`<h3>完形填空解题技巧</h3><h4>一、解题四步法</h4><ol><li><strong>通读全文</strong>：跳过空格，把握主旨大意</li><li><strong>逐题分析</strong>：利用上下文线索、词汇搭配、语法规则</li><li><strong>先易后难</strong>：先做确定的选择，缩小后续范围</li><li><strong>复读检查</strong>：代入全部选项，检查逻辑是否通顺</li></ol><h4>二、考点分布</h4><table><tr><th>考点</th><th>占比</th><th>解题思路</th></tr><tr><td>词汇辨析</td><td>~40%</td><td>根据上下文选择最恰当的词</td></tr><tr><td>固定搭配</td><td>~20%</td><td>熟记常见短语动词和介词搭配</td></tr><tr><td>语法结构</td><td>~15%</td><td>分析句子成分，选对连词和关系词</td></tr><tr><td>逻辑衔接</td><td>~15%</td><td>判断前后句的因果、转折、递进关系</td></tr><tr><td>上下文线索</td><td>~10%</td><td>原词复现、同义替换、反义对照</td></tr></table><h4>三、高频逻辑衔接词</h4><table><tr><th>逻辑关系</th><th>常见连接词</th></tr><tr><td>转折</td><td>however, nevertheless, yet, but, on the contrary, instead</td></tr><tr><td>因果</td><td>therefore, consequently, as a result, thus, hence, so</td></tr><tr><td>递进</td><td>moreover, furthermore, in addition, besides, what's more</td></tr><tr><td>举例</td><td>for example, for instance, such as, namely</td></tr><tr><td>总结</td><td>in conclusion, to sum up, in short, overall</td></tr></table><div class="tip"><span class="ti">✦</span><div><strong>核心原则：</strong>完形填空的答案一定在上下文中能找到线索。不确定时扩大阅读范围寻找关键词。</div></div>`,practice:[{q:"完形填空的正确解题顺序是？",o:["逐题翻译","通读→逐题→复读","先做难题","只凭语感"],a:1,e:"四步法：通读全文→逐题分析→先易后难→复读检查。"},{q:"The weather was terrible; ______, we cancelled the trip.",o:["therefore","however","moreover","meanwhile"],a:0,e:"因果关系→therefore因此。"}],pastExam:[]}]},{id:'reading',icon:'◧',name:'阅读理解',intro:'专四阅读含选择题和简答题。考查理解、推断和概括能力。',topics:[{id:'reading-skills',title:'阅读理解技巧',desc:'五大题型解题方法及答题策略',content:`<h3>阅读理解</h3><h4>一、五大题型</h4><table><tr><th>题型</th><th>标志词</th><th>解题方法</th></tr><tr><td>主旨大意题</td><td>main idea, mainly about, title, purpose</td><td>关注首尾段、各段首尾句；排除以偏概全的选项</td></tr><tr><td>事实细节题</td><td>according to, which is true, the author mentions</td><td>关键词定位→同义替换是答案（原句复现通常是陷阱）</td></tr><tr><td>推理判断题</td><td>infer, imply, suggest, conclude, learn from</td><td>基于原文一步推理，不主观联想</td></tr><tr><td>词义猜测题</td><td>the word "X" means..., is closest in meaning to</td><td>上下文语境、构词法、前后对比关系</td></tr><tr><td>态度观点题</td><td>attitude, tone, feel, the author thinks/believes</td><td>注意情感形容词/副词，区分客观与主观</td></tr></table><h4>二、答题策略</h4><ol><li><strong>先读题干再读文章</strong>—带着问题定位</li><li><strong>题序对应段序</strong>—题目顺序与段落顺序基本一致</li><li><strong>同义替换是答案</strong>—与原文措辞高度相同的通常是干扰项</li><li><strong>绝对化表达慎选</strong>—含only/must/all/never/completely的选项需严格验证</li><li><strong>简答题≤10词</strong>—直接精炼，用原文关键词</li></ol><h4>三、常见干扰项特征</h4><ul><li>张冠李戴：信息来自文中其他部分</li><li>无中生有：文中未提及的信息</li><li>过度推断：推理超过一步</li><li>以偏概全：用细节代替主旨</li><li>绝对化：使用all, never, only, must等极端词</li></ul>`,practice:[{q:"主旨大意题答案通常在文章的______。",o:["中间段落","首尾段","例子中","图表中"],a:1,e:"主旨大多在首尾段及段落首尾句。"},{q:"事实细节题正确选项通常是______。",o:["原文原句","同义替换","主观判断","绝对化表达"],a:1,e:"同义替换是答案特征。"},{q:"推理判断题的黄金原则是______。",o:["多步推理","推理不过一","主观推测","凭经验判断"],a:1,e:"基于原文进行一步推理。"}],pastExam:[]}]},{id:'writing',icon:'✎',name:'写作',intro:'专四写作包含命题作文(200词)和便条(50-60词)。本板块汇总历年真题并提供详细思路和范文。',topics:[{id:'composition',title:'命题作文',desc:'议论文结构、历年真题与范文思路',content:`<h3>命题作文 (200词/45分钟)</h3><h4>一、三段式结构</h4><table><tr><th>段落</th><th>功能</th><th>建议词数</th></tr><tr><td>引言段</td><td>引出话题+表明立场</td><td>~40词</td></tr><tr><td>主体段</td><td>论述观点+举例/分析(2-3个论点)</td><td>~120词</td></tr><tr><td>结论段</td><td>总结观点+升华/建议</td><td>~40词</td></tr></table><h4>二、高分句型</h4><p><strong>引言：</strong>Nowadays,there is a growing concern about... / It is widely believed that... / When it comes to..., opinions vary.</p><p><strong>论证：</strong>To begin with...For instance... / Another reason is that...A case in point is... / It is universally acknowledged that...</p><p><strong>结论：</strong>Taking all factors into account, we may safely draw the conclusion that... / Only by...can we...(倒装加分)</p><h4>三、高分技巧</h4><ul><li>使用连接词(firstly,furthermore,nevertheless,consequently)</li><li>多样化句式(倒装、强调、虚拟、定语从句交错使用)</li><li>高级词汇替换(important→significant/crucial/vital; many→numerous; think→believe/hold/argue)</li><li>避免口语化(不用wanna,gonna;can't→cannot)</li></ul>`,practice:[{q:"专四作文字数要求约为______。",o:["100词","150词","200词","300词"],a:2,e:"专四命题作文200词左右，45分钟。"},{q:"以下哪项不是高分写作要素？",o:["多样化句式","使用连接词","多用口语化表达","高级词汇替换"],a:2,e:"学术写作应避免口语化。"}],pastExam:[{y:2023,q:"Will online learning replace traditional classroom education?",o:[],a:-1,e:"<b>思路要点：</b><br>引言段：在线教育普及→但完全替代传统教育可能性不大<br>主体段1：在线教育优势—灵活方便、资源丰富、个性化学习<br>主体段2：传统教育不可替代—面对面互动、社交能力培养、实践操作<br>结论段：两者融合(blended learning)是未来趋势，取长补短<br><br><b>关键词汇：</b>flexibility, personalized learning, face-to-face interaction, social skills, hands-on experience, blended learning, complement rather than replace<br><b>参考句型：</b>While online education offers..., traditional classroom teaching remains indispensable because... / The ideal approach is to combine the best of both worlds."},{y:2022,q:"Is it necessary for college students to take part-time jobs?",o:[],a:-1,e:"<b>思路要点：</b><br>引言段：大学生兼职现象普遍→利大于弊<br>主体段1：有利方面—经济独立、积累工作经验、培养时间管理能力<br>主体段2：需注意—不能影响学业、选择与专业相关的兼职更佳<br>结论段：在平衡学业前提下鼓励兼职<br><br><b>关键词汇：</b>financial independence, work experience, time management, strike a balance, priority, gain insight into, put theory into practice<br><b>参考句型：</b>Part-time jobs provide an invaluable opportunity for students to... / It is crucial that students strike a balance between work and study."},{y:2021,q:"Should students evaluate their teachers?",o:[],a:-1,e:"<b>思路要点：</b><br>引言段：师生互评越来越普遍→双刃剑<br>主体段1：有利—促进教学质量提升、让学生有发言权、建立双向沟通<br>主体段2：潜在问题—学生评价可能不客观、给教师带来额外压力<br>结论段：应合理设计评价体系，扬长避短<br><br><b>关键词汇：</b>evaluation system, teaching quality, constructive feedback, objective, reciprocal, accountability, take...into account<br><b>参考句型：</b>Student evaluations serve as a valuable tool for... / However, it is important that these evaluations be designed carefully to avoid..."},{y:2020,q:"Is it better to work in a big company or a small one?",o:[],a:-1,e:"<b>思路要点：</b><br>引言段：毕业生面临大小公司选择→各有利弊，因人而异<br>主体段1：大公司—完善的培训体系、明确的晋升路径、资源和名声、但晋升可能缓慢<br>主体段2：小公司—更多责任和成长空间、灵活的环境、扁平化管理、但福利和稳定性不如大公司<br>结论段：取决于个人性格和职业目标，无标准答案<br><br><b>关键词汇：</b>career development, corporate culture, promotion path, hands-on experience, entrepreneurship, stability, hierarchy, start-up environment<br><b>参考句型：</b>While big companies offer..., small firms provide... / The choice ultimately depends on one's personality and career aspirations."},{y:2019,q:"Is pressure a bad thing?",o:[],a:-1,e:"<b>思路要点：</b><br>引言段：压力是生活的一部分→有两面性<br>主体段1：积极作用—转化为动力(motivation)、提升表现、适度的压力激发潜能<br>主体段2：过度压力的危害—影响身心健康、降低效率、导致职业倦怠(burnout)<br>结论段：关键不是消除压力，而是学会管理压力<br><br><b>关键词汇：</b>motivation, productivity, mental health, stress management, optimal level of stress, double-edged sword, coping mechanism<br><b>参考句型：</b>Pressure, when kept at a moderate level, can serve as a powerful motivator. / The key lies not in avoiding pressure but in learning to manage it effectively."}]},{id:'note-writing',title:'便条写作',desc:'便条格式、分类表达与历年真题',content:`<h3>便条写作 (50-60词/10分钟)</h3><h4>一、格式五要素</h4><p><strong>日期(右上角)→ 称呼(Dear...,) → 正文(简洁完整) → 结尾敬语(Yours,/Sincerely,) → 签名</strong></p><h4>二、常见类型及核心表达</h4><table><tr><th>类型</th><th>核心表达</th></tr><tr><td>道歉(Apology)</td><td>I am terribly sorry that... / Please accept my sincere apology for... / I do apologize for...</td></tr><tr><td>邀请(Invitation)</td><td>I would like to invite you to... / I was wondering if you could come to... / Would you be interested in...</td></tr><tr><td>感谢(Thanks)</td><td>I am writing to express my heartfelt gratitude for... / Thank you so much for... / I really appreciate...</td></tr><tr><td>询问(Inquiry)</td><td>I am writing to ask about... / I would appreciate it if you could tell me... / Could you possibly...</td></tr><tr><td>请假(Leave)</td><td>I am writing to ask for a sick leave of... / Please excuse my absence from... / I am unable to attend...</td></tr><tr><td>建议(Suggestion)</td><td>I would like to suggest that... / It might be a good idea to... / Why don't you... / You may want to...</td></tr><tr><td>祝贺(Congratulation)</td><td>Congratulations on... / I am delighted to hear that... / Well done on...</td></tr></table><div class="tip"><span class="ti">✦</span><div><strong>评分要点：</strong>格式(日期+称呼+敬语+签名) + 内容(覆盖所有要点) + 语言(简洁有礼) + 语法拼写无误。缺一不可。</div></div>`,practice:[{q:"专四便条写作词数要求约______。",o:["30-40词","50-60词","80-100词","100-120词"],a:1,e:"便条约50-60词，10分钟内完成。"},{q:"便条写作哪项不是必须的？",o:["日期","称呼","标题","结尾敬语"],a:2,e:"便条不需要标题，但日期+称呼+敬语+签名必不可少。"}],pastExam:[{y:2023,q:"Write a note to your roommate, apologizing for not being able to attend his/her birthday party.",o:[],a:-1,e:"<b>范文要点：</b><br>日期 + Dear [Name],<br>正文：I am terribly sorry that I cannot attend your birthday party this Saturday. My cousin will arrive from Beijing that afternoon, and I need to pick him up at the airport. I have prepared a small gift for you and will give it to you when I return. Wish you a happy birthday!<br>Yours, [Name]<br><b>关键词：</b>terribly sorry, cannot attend, pick up, prepared a gift, wish you a happy birthday"},{y:2022,q:"Write a note to a friend, inviting him/her to a concert this weekend.",o:[],a:-1,e:"<b>范文要点：</b><br>日期 + Dear [Name],<br>正文：I wonder if you would be interested in going to a concert with me this Saturday evening. The band will be performing at the City Stadium. I have got two tickets. I am sure we will have a great time together. Looking forward to your reply.<br>Yours, [Name]<br><b>关键词：</b>would be interested in, concert, performing, tickets, looking forward to"},{y:2021,q:"Write a note to your professor, asking for an extension of the deadline.",o:[],a:-1,e:"<b>范文要点：</b><br>日期 + Dear Professor [Name],<br>正文：I am writing to ask whether it would be possible for me to submit my assignment a few days later. I have been ill for the past three days and was unable to complete it on time. I would greatly appreciate your understanding.<br>Yours respectfully, [Name]<br><b>关键词：</b>extension, submit, assignment, appreciate, understanding"},{y:2020,q:"Write a note to a classmate, thanking him/her for helping you prepare for the exam.",o:[],a:-1,e:"<b>范文要点：</b><br>日期 + Dear [Name],<br>正文：I am writing to express my sincere gratitude for your generous help. Without your patient tutoring, I could not have passed the difficult math exam. Please let me know if there is anything I can do for you in return.<br>Yours, [Name]<br><b>关键词：</b>gratitude, generous help, patient tutoring, passed the exam, in return"},{y:2019,q:"Write a note to a foreign teacher, recommending a tourist attraction in China.",o:[],a:-1,e:"<b>范文要点：</b><br>日期 + Dear Mr. [Name],<br>正文：Knowing that you plan to travel in China, I would strongly recommend the West Lake in Hangzhou. It is renowned for its picturesque scenery and rich cultural heritage. You can take a boat ride on the lake and visit ancient temples nearby. I am sure you will enjoy the trip immensely!<br>Yours, [Name]<br><b>关键词：</b>recommend, renowned for, picturesque scenery, cultural heritage, immensely"}]}]},{id:'listening',icon:'◉',name:'听力理解',intro:'专四听力包含听写(Dictation)和听力理解两部分。本板块提供技巧和备考策略。',topics:[{id:'dictation',title:'听写 (Dictation)',desc:'考试形式、技巧和练习方法',content:`<h3>听写 (Dictation)</h3><h4>一、考试形式</h4><p>80-100词短文，朗读<strong>4遍</strong>：</p><ul><li><strong>第1遍：</strong>正常语速，<span class="highlight">只听不写</span>，听懂大意</li><li><strong>第2、3遍：</strong>按意群停顿(15词停顿10秒)，<span class="highlight">逐句写</span></li><li><strong>第4遍：</strong>正常语速，<span class="highlight">检查核对</span></li></ul><p>满分15分，占听力50%。</p><h4>二、听写技巧</h4><ol><li>第1遍听懂大意和难点词汇</li><li>第2、3遍速记(先实词→补虚词，用缩写和符号)</li><li>第4遍查漏补缺(补标点、检查拼写和语法)</li><li>最后2分钟通读检查(主谓一致、冠词、单复数)</li></ol><div class="tip"><span class="ti">✦</span><div><strong>常见扣分：</strong>冠词遗漏、拼写错误(每处扣0.5)、标点误用、主谓不一致。</div></div><h4>三、备考建议</h4><ul><li>每天1-2篇听写，坚持30天</li><li>建立缩写系统(govt, imp, esp, b/c=because)</li><li>注意连读、弱读、失去爆破等语音现象</li><li>精听历年真题，反复听直到完全写出</li></ul>`,practice:[{q:"专四听写共朗读______遍。",o:["2","3","4","5"],a:2,e:"共读4遍：1遍理解+2遍书写+1遍检查。"},{q:"听写第一遍应______。",o:["逐词写","只听不写","写关键句","检查拼写"],a:1,e:"第一遍只听不写，把握主题。"},{q:"听写短文约______词。",o:["50-60","80-100","150-200","200-250"],a:1,e:"约80-100词。"}],pastExam:[]},{id:'listening-comp',title:'听力理解策略',desc:'对话和短文解题技巧',content:`<h3>听力理解</h3><h4>一、题型</h4><table><tr><th>Section</th><th>内容</th><th>题量</th></tr><tr><td>A</td><td>对话(Conversations)</td><td>10题</td></tr><tr><td>B</td><td>短文(Passages)</td><td>10题</td></tr></table><h4>二、核心技巧</h4><ol><li><strong>预读选项</strong>—听前快速预测话题和问题</li><li><strong>抓住转折词</strong>—but, however, actually, in fact后常是答案</li><li><strong>注意数字信息</strong>—时间、价格、年龄、号码</li><li><strong>判断态度</strong>—通过语调和用词(disappointed, thrilled, annoyed)</li><li><strong>速记关键</strong>—用缩写记who,what,when,where,why</li></ol><h4>三、场景高频词</h4><table><tr><th>场景</th><th>高频词</th></tr><tr><td>校园</td><td>semester, credit, assignment, lecture, dorm, scholarship, major, tuition</td></tr><tr><td>医院</td><td>symptom, prescription, appointment, surgery, diagnose, recovery</td></tr><tr><td>机场/车站</td><td>departure, arrival, delay, boarding, luggage, platform, terminal</td></tr><tr><td>酒店/餐厅</td><td>reservation, check-in, menu, bill, tip, room service</td></tr><tr><td>职场</td><td>interview, promotion, salary, resume, colleague, deadline, overtime</td></tr></table>`,practice:[{q:"听力中转折词后面通常______。",o:["不重要","是答案所在","是干扰信息","可以忽略"],a:1,e:"转折后是说话人真正意图。"},{q:"听力前最重要的准备工作是______。",o:["背单词","预读选项","做笔记","查语法"],a:1,e:"利用间隙快速预读选项。"}],pastExam:[]}]}]};
+
+// ==================== APP LOGIC ====================
+let currentCat=null,currentTopic=null,quizIdx=0,quizState={};
+
+function init(){buildSidebar();showHome();loadApiKey();}
+
+function buildSidebar(){
+  let h=''; DATA.categories.forEach(c=>{
+    let open=currentCat&&currentCat.id===c.id;
+    h+=`<div class="cat-item"><button class="cat-btn${open?' open':''}" onclick="toggleCat('${c.id}')"><span>${c.icon} ${c.name}</span><span class="arr">▶</span></button>`;
+    h+=`<div class="cat-kids${open?' show':''}" id="kids_${c.id}">`;
+    c.topics.forEach(t=>h+=`<div class="topic-link" onclick="openTopic('${c.id}','${t.id}')">${t.title}</div>`);
+    h+=`</div></div>`;
+  });
+  document.getElementById('sidebarNav').innerHTML=h;
+}
+
+function toggleCat(id){
+  const el=document.getElementById('kids_'+id),btn=el.previousElementSibling;
+  if(el.classList.contains('show')){el.classList.remove('show');btn.classList.remove('open');}
+  else{el.classList.add('show');btn.classList.add('open');}
+}
+
+function find(cid,tid){const cat=DATA.categories.find(c=>c.id===cid);if(!cat)return[null,null];const t=cat.topics.find(x=>x.id===tid);return[cat,t];}
+
+function showHome(){
+  currentCat=null;currentTopic=null;
+  let h=`<div class="hero"><div class="emoji">●</div><h2>Icey <em>TEM4</em> Review System</h2><p>覆盖英语专四全部考点：语法、词汇、完形、阅读、写作、听力。<br>每个知识点配有详细讲解、专项练习和历年真题详解。<br>右侧 AI助教随时答疑。</p>`;
+  h+=`<div class="hero-grid">`;
+  DATA.categories.forEach(c=>{
+    h+=`<div class="hero-card" onclick="openCategory('${c.id}')"><span class="hc-icon">${c.icon}</span><div class="hc-title">${c.name}</div><div class="hc-count">${c.topics.length} 个知识点</div></div>`;
+  });
+  h+=`</div></div>`;
+  document.getElementById('mainContent').innerHTML=h;
+  highlightSidebar(null,null);
+}
+
+function openCategory(cid){
+  currentCat=DATA.categories.find(c=>c.id===cid);currentTopic=null;
+  if(!currentCat)return;
+  let h=`<div class="cat-head"><div class="ch-icon">${currentCat.icon}</div><h2>${currentCat.name}</h2><p>${currentCat.intro}</p></div>`;
+  h+=`<div class="topic-grid">`;
+  currentCat.topics.forEach(t=>{
+    h+=`<div class="t-card" onclick="openTopic('${cid}','${t.id}')"><div class="ttl">${t.title}</div><div class="dsc">${t.desc}</div></div>`;
+  });
+  h+=`</div>`;
+  document.getElementById('mainContent').innerHTML=h;
+  highlightSidebar(null,null);buildSidebar();window.scrollTo(0,0);
+}
+
+function openTopic(cid,tid){
+  const[cat,topic]=find(cid,tid);if(!cat||!topic)return;
+  currentCat=cat;currentTopic=topic;quizIdx=0;quizState={};
+  topic.practice.forEach((_,i)=>{quizState[i]={sel:null,ok:false,right:false};});
+  let h=`<div class="topic-hero"><div class="bread">${cat.icon} ${cat.name} <span>› ${topic.title}</span></div><h2>${topic.title}</h2></div>`;
+  h+=`<div class="content-block">${topic.content}</div>`;
+  if(topic.practice&&topic.practice.length>0)h+=renderPractice(0);
+  if(topic.pastExam&&topic.pastExam.length>0)h+=renderPastExam();
+  document.getElementById('mainContent').innerHTML=h;
+  highlightSidebar(cid,tid);buildSidebar();closeMobileSidebar();window.scrollTo(0,0);
+}
+
+function highlightSidebar(cid,tid){
+  document.querySelectorAll('.topic-link').forEach(e=>e.classList.remove('active'));
+  if(cid&&tid)document.querySelectorAll('.topic-link').forEach(e=>{if(e.getAttribute('onclick')===`openTopic('${cid}','${tid}')`)e.classList.add('active');});
+}
+
+function renderPractice(idx){
+  if(!currentTopic)return'';
+  const qs=currentTopic.practice,q=qs[idx],st=quizState[idx];
+  const done=Object.values(quizState).filter(s=>s.ok).length;
+  const correct=Object.values(quizState).filter(s=>s.right).length;
+  let h=`<div class="quiz-block" id="quizBlock"><h3>📝 练习题 (${idx+1}/${qs.length})</h3>`;
+  h+=`<div class="quiz-progress">已完成 ${done}/${qs.length} 题`;
+  if(done>0)h+=` · 正确率 ${Math.round(correct/done*100)}%`;
+  h+=`</div><div class="quiz-q"><div class="q-text">${idx+1}. ${q.q}</div><div class="quiz-opts">`;
+  q.o.forEach((o,i)=>{
+    let cls='quiz-opt';if(st.ok)cls+=' disabled';if(st.ok&&i===q.a)cls+=' correct';else if(st.ok&&i===st.sel&&i!==q.a)cls+=' wrong';else if(!st.ok&&st.sel===i)cls+=' sel';
+    h+=`<div class="${cls}" id="opt_${idx}_${i}" onclick="pickAnswer(${idx},${i})">${String.fromCharCode(65+i)}. ${o}</div>`;
+  });
+  h+=`</div>`;
+  if(st.ok)h+=`<div class="quiz-fb show ${st.right?'ok':'bad'}"><strong>${st.right?'✓ 回答正确！':'✗ 回答错误'}</strong><br>${q.e}</div>`;
+  h+=`</div><div class="quiz-btns"><button class="btn btn-o" onclick="prevQ(${idx})"${idx===0?' disabled':''}>‹ 上一题</button>`;
+  if(!st.ok)h+=`<span class="info">点击选项确认</span>`;else h+=`<span class="info">${st.right?'正确 ✓':'错误 ✗'}</span>`;
+  if(idx<qs.length-1)h+=`<button class="btn btn-p" onclick="nextQ(${idx})">下一题 ›</button>`;
+  else if(st.ok)h+=`<button class="btn btn-p" onclick="showPracticeScore()">查看成绩 ›</button>`;
+  h+=`</div>`;return h;
+}
+
+function pickAnswer(qi,oi){const st=quizState[qi];if(st.ok)return;st.sel=oi;st.ok=true;st.right=(oi===currentTopic.practice[qi].a);refreshQuiz(qi);}
+function prevQ(i){if(i<=0)return;quizIdx=i-1;updateQuizDOM(renderPractice(quizIdx));document.getElementById('quizBlock')?.scrollIntoView({behavior:'smooth',block:'center'});}
+function nextQ(i){if(i>=currentTopic.practice.length-1)return;quizIdx=i+1;updateQuizDOM(renderPractice(quizIdx));document.getElementById('quizBlock')?.scrollIntoView({behavior:'smooth',block:'center'});}
+
+function showPracticeScore(){
+  const qs=currentTopic.practice;
+  const c=Object.values(quizState).filter(s=>s.right).length;
+  const pct=Math.round(c/qs.length*100);
+  let emoji=pct>=80?'●':pct>=60?'◉':'○';
+  let h=`<div class="quiz-block"><h3>📝 练习成绩</h3><div class="score-box"><div class="big">${c}/${qs.length}</div><div class="lbl">正确率 ${pct}%</div><div class="emoji">${emoji}</div><p style="margin-top:12px;color:var(--sub);font-size:13px">${pct>=80?'非常棒！这个知识点掌握扎实。':pct>=60?'不错，再看一遍详解会更好！':'继续加油，多看几遍就能攻克！'}</p><button class="btn btn-o" style="margin-top:12px" onclick="retryPractice()">↻ 重新练习</button></div></div>`;
+  updateQuizDOM(h);
+}
+
+function retryPractice(){
+  quizIdx=0;quizState={};currentTopic.practice.forEach((_,i)=>{quizState[i]={sel:null,ok:false,right:false};});
+  updateQuizDOM(renderPractice(0));window.scrollTo(0,0);
+}
+
+function refreshQuiz(i){updateQuizDOM(renderPractice(i));}
+function updateQuizDOM(h){
+  const t=document.createElement('div');t.innerHTML=h;
+  const oldQ=document.getElementById('quizBlock'),oldB=document.querySelector('.quiz-btns');
+  const nq=t.querySelector('.quiz-block'),nb=t.querySelector('.quiz-btns');
+  if(oldQ&&nq)oldQ.replaceWith(nq);
+  if(oldB&&nb)oldB.replaceWith(nb);else if(nb&&document.querySelector('.quiz-block'))document.querySelector('.quiz-block').after(nb);
+  if(!nq&&t.firstElementChild){const mb=document.getElementById('mainContent');const lb=mb.querySelector('.quiz-block');if(lb)lb.replaceWith(t.firstElementChild);}
+}
+
+// ==================== PAST EXAM ====================
+function renderPastExam(){
+  if(!currentTopic||!currentTopic.pastExam)return'';
+  let h=`<div class="past-exam-block"><h3>◈ 历年真题 · ${currentTopic.pastExam.length} 道</h3>`;
+  h+=`<div class="pe-subtitle">收录 2014-2023 年专四真题，点击选项查看对错与详析</div>`;
+  currentTopic.pastExam.forEach((pe,pi)=>{
+    h+=`<div class="pe-question"><div class="pe-header"><span class="pe-year">${pe.y} 真题</span></div>`;
+    h+=`<div class="pe-qtext">${pi+1}. ${pe.q}</div>`;
+    if(pe.o&&pe.o.length>0){
+      h+=`<div class="pe-opts">`;
+      pe.o.forEach((o,oi)=>{h+=`<div class="pe-opt" id="pe_${pi}_${oi}" onclick="checkPastExam(${pi},${oi})">${String.fromCharCode(65+oi)}. ${o}</div>`;});
+      h+=`</div>`;
+    }
+    h+=`<div class="pe-exp" id="peExp_${pi}"><b>解析：</b>${pe.e}</div>`;
+    if(pe.o&&pe.o.length>0)h+=`<span class="pe-toggle" id="peToggle_${pi}" onclick="togglePastExp(${pi})">▶ 查看解析</span>`;
+  });
+  h+=`</div>`;return h;
+}
+
+function checkPastExam(pi,oi){
+  const pe=currentTopic.pastExam[pi];if(pe.a<0)return;
+  document.querySelectorAll(`.pe-opt[id^="pe_${pi}_"]`).forEach(el=>el.style.pointerEvents='none');
+  pe.o.forEach((_,i)=>{
+    const el=document.getElementById(`pe_${pi}_${i}`);
+    if(i===pe.a)el.classList.add('right');else if(i===oi)el.classList.add('wrong');
+  });
+  document.getElementById(`peExp_${pi}`).classList.add('show');
+  const tg=document.getElementById(`peToggle_${pi}`);if(tg)tg.style.display='none';
+}
+
+function togglePastExp(pi){document.getElementById(`peExp_${pi}`).classList.toggle('show');}
+
+// ==================== AI PANEL ====================
+let apiKey=localStorage.getItem('tem4_api_key')||'',aiMsgs=[];
+function loadApiKey(){const inp=document.getElementById('apiKeyInput');if(inp)inp.value=apiKey;}
+function saveApiKey(){
+  const inp=document.getElementById('apiKeyInput');apiKey=inp.value.trim();
+  localStorage.setItem('tem4_api_key',apiKey);
+  if(apiKey)aiMsgs=[];renderAIMessages();
+}
+
+function toggleAIPanel(){
+  document.getElementById('aiPanel').classList.toggle('open');
+  document.getElementById('mainContent').classList.toggle('ai-open');
+}
+
+async function sendMsg(){
+  const inp=document.getElementById('aiInput'),msg=inp.value.trim();if(!msg)return;
+  if(!apiKey){alert('请先在 AI 面板中设置 Anthropic API Key！');return;}
+  inp.value='';aiMsgs.push({role:'user',content:msg});renderAIMessages();
+  const msgsDiv=document.getElementById('aiMessages');
+  const ld=document.createElement('div');ld.className='ai-msg assistant loading';ld.id='aiLoading';
+  ld.innerHTML='<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+  msgsDiv.appendChild(ld);msgsDiv.scrollTop=msgsDiv.scrollHeight;
+
+  let sys='你是 TEM4（英语专四）复习助手。用中文回答，简洁专业。';
+  if(currentTopic)sys+=` 学生当前在学习：${currentCat.name} > ${currentTopic.title}。`;
+  const messages=[{role:'system',content:sys}];
+  aiMsgs.slice(-10).forEach(m=>messages.push({role:m.role,content:m.content}));
+
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2000,messages})
+    });
+    const data=await resp.json();
+    document.getElementById('aiLoading')?.remove();
+    if(data.error)aiMsgs.push({role:'assistant',content:'错误：'+data.error.message});
+    else aiMsgs.push({role:'assistant',content:data.content?.[0]?.text||'（未获得回复）'});
+    renderAIMessages();
+  }catch(e){
+    document.getElementById('aiLoading')?.remove();
+    aiMsgs.push({role:'assistant',content:'网络错误：'+e.message+'。请检查 API Key 和网络。'});
+    renderAIMessages();
+  }
+}
+
+function renderAIMessages(){
+  const div=document.getElementById('aiMessages');
+  let h='';aiMsgs.forEach(m=>h+=`<div class="ai-msg ${m.role}">${m.content.replace(/\n/g,'<br>')}</div>`);
+  if(aiMsgs.length===0)h=`<div class="ai-msg assistant">你好！我是 TEM4 复习助手。<br>可以问我任何专四相关问题：<br>· 语法点不理解？<br>· 真题为什么选这个答案？<br>· 作文思路和模板？<br>· 听力和阅读技巧？<br><br>请先设置 Anthropic API Key。</div>`;
+  div.innerHTML=h;div.scrollTop=div.scrollHeight;
+}
+
+// ==================== MOBILE ====================
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('mob');document.querySelector('.overlay').classList.toggle('show');}
+function closeAll(){document.getElementById('sidebar').classList.remove('mob');document.querySelector('.overlay').classList.remove('show');}
+function closeMobileSidebar(){document.getElementById('sidebar').classList.remove('mob');document.querySelector('.overlay').classList.remove('show');}
+
+init();
+</script>
+</body>
+</html>
