@@ -267,6 +267,26 @@ code{background:rgba(0,0,0,.04);padding:2px 5px;font-size:12px;color:var(--accen
 .radar-legend .pct{font-weight:700;text-align:right}
 .radar-legend .bar-wrap{background:rgba(0,0,0,.06);height:6px;margin-top:4px}
 .radar-legend .bar-fill{height:100%;transition:width .5s}
+
+/* Essay Correction */
+.essay-section{margin-bottom:20px}
+.essay-section h4{font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)}
+.essay-upload-area{border:2px dashed var(--border);padding:24px;text-align:center;cursor:pointer;transition:all .15s;background:rgba(0,0,0,.01)}
+.essay-upload-area:hover{border-color:var(--text);background:rgba(0,0,0,.03)}
+.essay-upload-area input[type=file]{display:none}
+.essay-upload-area .upload-icon{font-size:32px;margin-bottom:6px}
+.essay-upload-area .upload-text{font-size:12px;color:var(--sub)}
+.essay-textarea{width:100%;padding:14px;border:2px solid var(--text);font-size:13px;line-height:1.7;resize:vertical;font-family:Editorial,Georgia,"Noto Serif SC",serif;background:var(--card);outline:none}
+.essay-textarea:focus{border-color:var(--accent)}
+.essay-recognized{background:rgba(0,0,0,.015);border:2px solid var(--border);padding:16px;font-size:13px;line-height:1.7;max-height:300px;overflow-y:auto;white-space:pre-wrap;font-family:Editorial,Georgia,"Noto Serif SC",serif;color:var(--sub)}
+.essay-result{background:var(--card);border:2px solid var(--accent);padding:20px;margin-top:16px}
+.essay-result h4{font-size:13px;font-weight:800;margin-bottom:10px;color:var(--accent)}
+.essay-result .content{font-size:13px;line-height:1.8}
+.essay-preview-img{max-width:100%;max-height:300px;border:2px solid var(--border);display:block;margin-top:10px}
+.essay-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.essay-divider{text-align:center;color:var(--sub);font-size:11px;margin:16px 0;text-transform:uppercase;letter-spacing:1px;position:relative}
+.essay-divider::before,.essay-divider::after{content:'';position:absolute;top:50%;width:40%;height:1px;background:var(--border)}
+.essay-divider::before{left:0}.essay-divider::after{right:0}
 </style>
 </head>
 <body>
@@ -533,6 +553,7 @@ function buildSidebar(){
     h+=`</div></div>`;
   });
   h+=`<div class="topic-link" onclick="openWrongBook()" style="margin-top:8px;border-top:2px solid var(--text);padding-top:12px;font-weight:700;color:var(--accent)">◆ 错题本 <span class="wb-badge" id="wbBadge" style="display:none">0</span></div>`;
+  h+=`<div class="topic-link" onclick="openEssayCorrection()" style="font-weight:700;color:var(--accent2)">✎ 作文批改</div>`;
   document.getElementById('sidebarNav').innerHTML=h;
 }
 
@@ -671,6 +692,145 @@ function checkPastExam(pi,oi){
 }
 
 function togglePastExp(pi){document.getElementById(`peExp_${pi}`).classList.toggle('show');}
+
+// ==================== ESSAY CORRECTION ====================
+let essayImageFile=null,essayImageDataUrl=null;
+
+function openEssayCorrection(){
+  currentCat=null;currentTopic=null;
+  let h=`<div class="cat-head"><div class="ch-icon">✎</div><h2>作文批改</h2><p>上传作文图片或直接输入文本，AI 助教帮你批改语法、词汇、结构和逻辑</p></div>`;
+  h+=`<div class="content-block">`;
+  // Image upload section
+  h+=`<div class="essay-section"><h4>📷 上传作文图片</h4>`;
+  h+=`<div class="essay-upload-area" id="essayUploadArea" onclick="document.getElementById('essayFileInput').click()">`;
+  h+=`<input type="file" id="essayFileInput" accept="image/*" onchange="handleEssayImage(event)">`;
+  h+=`<div class="upload-icon">📄</div><div class="upload-text">点击选择图片 或拖拽到此处</div></div>`;
+  h+=`<img class="essay-preview-img" id="essayPreviewImg" style="display:none" alt="preview">`;
+  h+=`<div class="essay-recognized" id="essayRecognizedText" style="display:none;margin-top:12px"></div>`;
+  h+=`</div>`;
+  // Divider
+  h+=`<div class="essay-divider">或</div>`;
+  // Text input section
+  h+=`<div class="essay-section"><h4>✏️ 直接输入作文</h4>`;
+  h+=`<textarea class="essay-textarea" id="essayTextInput" placeholder="在此处输入或粘贴你的英语作文（200词左右）..." rows="15" oninput="onEssayTextInput()"></textarea>`;
+  h+=`</div>`;
+  // Actions
+  h+=`<div class="essay-actions"><button class="btn btn-p" id="essaySubmitBtn" onclick="submitEssayForCorrection()">✉ 提交批改</button>`;
+  h+=`<button class="btn btn-o" id="clearEssayBtn" onclick="clearEssay()">✕ 清空</button></div>`;
+  // Result area
+  h+=`<div class="essay-result" id="essayResult" style="display:none"><h4>📝 批改结果</h4><div class="content" id="essayResultContent"></div></div>`;
+  h+=`</div>`;
+  document.getElementById('mainContent').innerHTML=h;
+  highlightSidebar(null,null);buildSidebar();window.scrollTo(0,0);
+}
+
+function handleEssayImage(event){
+  const file=event.target.files[0];
+  if(!file)return;
+  essayImageFile=file;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    essayImageDataUrl=e.target.result;
+    const img=document.getElementById('essayPreviewImg');
+    if(img){img.src=essayImageDataUrl;img.style.display='block';}
+    const textInput=document.getElementById('essayTextInput');
+    if(textInput)textInput.value='';
+    const recog=document.getElementById('essayRecognizedText');
+    if(recog){recog.style.display='block';recog.textContent='图片已上传，识别功能将在集成 Tesseract.js 后启用。当前可直接在文本框中输入作文。';}
+  };
+  reader.readAsDataURL(file);
+}
+
+function onEssayTextInput(){
+  const textInput=document.getElementById('essayTextInput');
+  if(textInput&&textInput.value.trim()){
+    essayImageFile=null;essayImageDataUrl=null;
+    const img=document.getElementById('essayPreviewImg');
+    if(img)img.style.display='none';
+    const fileInput=document.getElementById('essayFileInput');
+    if(fileInput)fileInput.value='';
+    const recog=document.getElementById('essayRecognizedText');
+    if(recog){recog.style.display='none';recog.textContent='';}
+  }
+}
+
+function clearEssay(){
+  essayImageFile=null;essayImageDataUrl=null;
+  const img=document.getElementById('essayPreviewImg');
+  if(img)img.style.display='none';
+  const fileInput=document.getElementById('essayFileInput');
+  if(fileInput)fileInput.value='';
+  const recog=document.getElementById('essayRecognizedText');
+  if(recog){recog.style.display='none';recog.textContent='';}
+  const textInput=document.getElementById('essayTextInput');
+  if(textInput)textInput.value='';
+  const result=document.getElementById('essayResult');
+  if(result)result.style.display='none';
+}
+
+async function submitEssayForCorrection(){
+  const textInput=document.getElementById('essayTextInput');
+  const recogText=document.getElementById('essayRecognizedText');
+  const resultDiv=document.getElementById('essayResult');
+  const resultContent=document.getElementById('essayResultContent');
+
+  let essayContent='';
+  if(textInput&&textInput.value.trim()){
+    essayContent=textInput.value.trim();
+  }else if(recogText&&recogText.textContent&&recogText.textContent.trim()&&recogText.style.display!=='none'){
+    essayContent=recogText.textContent.trim();
+  }
+
+  if(!essayContent){
+    alert('请先输入作文或上传作文图片！');
+    return;
+  }
+
+  if(essayContent.length<30){
+    alert('作文太短，请至少输入30个字符。');
+    return;
+  }
+
+  if(!apiKey){
+    alert('请先在 AI 面板中设置 DeepSeek API Key！');
+    return;
+  }
+
+  if(resultDiv)resultDiv.style.display='block';
+  if(resultContent)resultContent.innerHTML='<div class="ai-msg loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
+
+  const prompt=`请批改以下英语专四作文（TEM-4 Writing）。请从以下几个方面进行评估：
+
+1. **内容与论点** (Content & Argument)：是否切题、论点是否清晰
+2. **结构与逻辑** (Structure & Logic)：段落组织、逻辑连贯性
+3. **语法与词汇** (Grammar & Vocabulary)：语法错误、用词准确性和多样性
+4. **总体评分** (Overall Score)：按专四15分制打分
+
+请用中文回复，指出具体错误并给出修改建议，最后给出修改后的范文。
+
+作文内容：
+${essayContent}`;
+
+  try{
+    const resp=await fetch('https://api.deepseek.com/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+      body:JSON.stringify({model:'deepseek-chat',max_tokens:3000,messages:[
+        {role:'system',content:'你是英语专四（TEM-4）作文批改专家。请用中文详细批改学生作文，指出具体错误位置、错误类型和修改方法。'},
+        {role:'user',content:prompt}
+      ]})
+    });
+    const data=await resp.json();
+    if(data.error){
+      if(resultContent)resultContent.innerHTML=`<p style="color:var(--danger)">错误：${data.error.message}</p>`;
+    }else{
+      const reply=data.choices?.[0]?.message?.content||'（未获得回复）';
+      if(resultContent)resultContent.innerHTML=reply.replace(/\n/g,'<br>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    }
+  }catch(e){
+    if(resultContent)resultContent.innerHTML=`<p style="color:var(--danger)">网络错误：${e.message}</p>`;
+  }
+}
 
 // ==================== WRONG BOOK UI ====================
 function openWrongBook(){
