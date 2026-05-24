@@ -276,11 +276,11 @@ code{background:rgba(0,0,0,.04);padding:2px 5px;font-size:12px;color:var(--accen
   </div>
   <div class="ai-settings">
     <span>API KEY</span>
-    <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+    <input type="password" id="apiKeyInput" placeholder="sk-...">
     <button onclick="saveApiKey()" style="padding:4px 8px;font-size:9px;border:2px solid var(--text);background:var(--card);cursor:pointer;font-weight:700">保存</button>
   </div>
   <div class="ai-msgs" id="aiMessages">
-    <div class="ai-msg assistant">你好！我是 TEM4 复习助手。<br>可以问我任何专四相关问题：<br>· 语法点不理解？<br>· 真题为什么选这个答案？<br>· 作文思路和模板？<br>· 听力和阅读技巧？<br><br>请先设置 Anthropic API Key。</div>
+    <div class="ai-msg assistant">你好！我是 TEM4 复习助手。<br>可以问我任何专四相关问题：<br>· 语法点不理解？<br>· 真题为什么选这个答案？<br>· 作文思路和模板？<br>· 听力和阅读技巧？<br><br>请先设置 DeepSeek API Key。</div>
   </div>
   <div class="ai-input-area">
     <div class="ai-input-row">
@@ -552,7 +552,7 @@ function renderPractice(idx){
   });
   h+=`</div>`;
   if(st.ok)h+=`<div class="quiz-fb show ${st.right?'ok':'bad'}"><strong>${st.right?'✓ 回答正确！':'✗ 回答错误'}</strong><br>${q.e}</div>`;
-  h+=`</div><div class="quiz-btns"><button class="btn btn-o" onclick="prevQ(${idx})"${idx===0?' disabled':''}>‹ 上一题</button>`;
+  h+=`</div></div><div class="quiz-btns"><button class="btn btn-o" onclick="prevQ(${idx})"${idx===0?' disabled':''}>‹ 上一题</button>`;
   if(!st.ok)h+=`<span class="info">点击选项确认</span>`;else h+=`<span class="info">${st.right?'正确 ✓':'错误 ✗'}</span>`;
   if(idx<qs.length-1)h+=`<button class="btn btn-p" onclick="nextQ(${idx})">下一题 ›</button>`;
   else if(st.ok)h+=`<button class="btn btn-p" onclick="showPracticeScore()">查看成绩 ›</button>`;
@@ -560,8 +560,8 @@ function renderPractice(idx){
 }
 
 function pickAnswer(qi,oi){const st=quizState[qi];if(st.ok)return;st.sel=oi;st.ok=true;st.right=(oi===currentTopic.practice[qi].a);refreshQuiz(qi);}
-function prevQ(i){if(i<=0)return;quizIdx=i-1;updateQuizDOM(renderPractice(quizIdx));document.getElementById('quizBlock')?.scrollIntoView({behavior:'smooth',block:'center'});}
-function nextQ(i){if(i>=currentTopic.practice.length-1)return;quizIdx=i+1;updateQuizDOM(renderPractice(quizIdx));document.getElementById('quizBlock')?.scrollIntoView({behavior:'smooth',block:'center'});}
+function prevQ(i){if(i<=0)return;quizIdx=i-1;updateQuizDOM(renderPractice(quizIdx));}
+function nextQ(i){if(i>=currentTopic.practice.length-1)return;quizIdx=i+1;updateQuizDOM(renderPractice(quizIdx));}
 
 function showPracticeScore(){
   const qs=currentTopic.practice;
@@ -574,7 +574,7 @@ function showPracticeScore(){
 
 function retryPractice(){
   quizIdx=0;quizState={};currentTopic.practice.forEach((_,i)=>{quizState[i]={sel:null,ok:false,right:false};});
-  updateQuizDOM(renderPractice(0));window.scrollTo(0,0);
+  updateQuizDOM(renderPractice(0));document.getElementById('quizBlock')?.scrollIntoView({behavior:'smooth',block:'center'});
 }
 
 function refreshQuiz(i){updateQuizDOM(renderPractice(i));}
@@ -635,7 +635,7 @@ function toggleAIPanel(){
 
 async function sendMsg(){
   const inp=document.getElementById('aiInput'),msg=inp.value.trim();if(!msg)return;
-  if(!apiKey){alert('请先在 AI 面板中设置 Anthropic API Key！');return;}
+  if(!apiKey){alert('请先在 AI 面板中设置 DeepSeek API Key！');return;}
   inp.value='';aiMsgs.push({role:'user',content:msg});renderAIMessages();
   const msgsDiv=document.getElementById('aiMessages');
   const ld=document.createElement('div');ld.className='ai-msg assistant loading';ld.id='aiLoading';
@@ -648,15 +648,15 @@ async function sendMsg(){
   aiMsgs.slice(-10).forEach(m=>messages.push({role:m.role,content:m.content}));
 
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    const resp=await fetch('https://api.deepseek.com/v1/chat/completions',{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2000,messages})
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},
+      body:JSON.stringify({model:'deepseek-chat',max_tokens:2000,messages})
     });
     const data=await resp.json();
     document.getElementById('aiLoading')?.remove();
     if(data.error)aiMsgs.push({role:'assistant',content:'错误：'+data.error.message});
-    else aiMsgs.push({role:'assistant',content:data.content?.[0]?.text||'（未获得回复）'});
+    else aiMsgs.push({role:'assistant',content:data.choices?.[0]?.message?.content||'（未获得回复）'});
     renderAIMessages();
   }catch(e){
     document.getElementById('aiLoading')?.remove();
@@ -668,7 +668,7 @@ async function sendMsg(){
 function renderAIMessages(){
   const div=document.getElementById('aiMessages');
   let h='';aiMsgs.forEach(m=>h+=`<div class="ai-msg ${m.role}">${m.content.replace(/\n/g,'<br>')}</div>`);
-  if(aiMsgs.length===0)h=`<div class="ai-msg assistant">你好！我是 TEM4 复习助手。<br>可以问我任何专四相关问题：<br>· 语法点不理解？<br>· 真题为什么选这个答案？<br>· 作文思路和模板？<br>· 听力和阅读技巧？<br><br>请先设置 Anthropic API Key。</div>`;
+  if(aiMsgs.length===0)h=`<div class="ai-msg assistant">你好！我是 TEM4 复习助手。<br>可以问我任何专四相关问题：<br>· 语法点不理解？<br>· 真题为什么选这个答案？<br>· 作文思路和模板？<br>· 听力和阅读技巧？<br><br>请先设置 DeepSeek API Key。</div>`;
   div.innerHTML=h;div.scrollTop=div.scrollHeight;
 }
 
